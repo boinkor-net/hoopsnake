@@ -38,7 +38,8 @@ func main() {
 		io.WriteString(s, fmt.Sprintf("public key used by %s:\n", s.User()))
 		s.Write(authorizedKey)
 	})
-	publicKeyOption := ssh.PublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
+	var sshOptions []ssh.Option
+	sshOptions = append(sshOptions, ssh.PublicKeyAuth(func(ctx ssh.Context, key ssh.PublicKey) bool {
 		log.Printf("Attempting auth for user %q with public key %q", ctx.User(), gossh.MarshalAuthorizedKey(key))
 		matched := false
 		for _, authorized := range authorizedPubKeys {
@@ -47,7 +48,10 @@ func main() {
 			}
 		}
 		return matched
-	})
+	}))
+	if *hostKey != "" {
+		sshOptions = append(sshOptions, ssh.HostKeyFile(*hostKey))
+	}
 	log.Println("starting ssh server on port 2222...")
-	log.Fatal(ssh.ListenAndServe("127.0.0.1:2222", nil, publicKeyOption))
+	log.Fatal(ssh.ListenAndServe("127.0.0.1:2222", nil, sshOptions...))
 }
