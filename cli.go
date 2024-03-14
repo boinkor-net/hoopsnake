@@ -12,6 +12,7 @@ import (
 	"path"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/creack/pty"
@@ -35,6 +36,8 @@ type TailnetSSH struct {
 	hostKeyFile       string
 	authorizedKeyFile string
 	tsnetVerbose      bool
+	deleteExisting    bool
+	maxNodeAge        time.Duration
 	tags              []string
 	command           []string
 }
@@ -48,6 +51,9 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	fs.StringVar(&s.hostKeyFile, "hostKey", "", "Pathname to the SSH host key")
 	fs.StringVar(&s.authorizedKeyFile, "authorizedKeys", "", "Pathname to a file listing authorized client keys")
 	fs.BoolVar(&s.tsnetVerbose, "tsnetVerbose", false, "Log tsnet messages verbosely")
+	fs.BoolVar(&s.deleteExisting, "deleteExisting", false, "Delete any down node with a conflicting name, if one exists")
+	fs.DurationVar(&s.maxNodeAge, "maxNodeAge", 30*time.Second, "Matching node must be offline at least this long if -deleteExisting is set")
+
 	var tags string
 	fs.StringVar(&tags, "tags", "", "Tailnet ACL tags assigned to the node, comma-separated")
 	root := &ffcli.Command{
@@ -126,6 +132,7 @@ func (s *TailnetSSH) setupHostKey() error {
 // If Run returns an error, that means it can no longer listen - these
 // errors are fatal.
 func (s *TailnetSSH) Run(ctx context.Context) error {
+	var err error
 	s.Server.Handler = s.handle
 
 	srv := &tsnet.Server{
@@ -137,17 +144,21 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 	if s.tsnetVerbose {
 		srv.Logf = log.Printf
 	}
-	clientID := os.Getenv("TS_API_CLIENT_ID")
-	clientSecret := os.Getenv("TS_API_CLIENT_SECRET")
-	if clientID != "" && clientSecret != "" {
-		authKey, err := s.setupOAuth(ctx, clientID, clientSecret)
-		if err != nil {
-			return fmt.Errorf("could not setup with oauth2: %w", err)
-		}
-		srv.AuthKey = authKey
-	}
 
-	_, err := srv.Up(ctx)
+	authKey := os.Getenv("TS_AUTHKEY")
+	if authKey == "" {
+		var tsClient *tailscale.Client
+		authKey, tsClient, err = s.mintAuthKey(ctx)
+		if err != nil {
+			return fmt.Errorf("could not mint auth key: %w", err)
+		}
+		if s.deleteExisting {
+			s.cleanupOldNodes(ctx, tsClient)
+		}
+	}
+	srv.AuthKey = authKey
+
+	_, err = srv.Up(ctx)
 	if err != nil {
 		return fmt.Errorf("could not connect to tailnet: %w", err)
 	}
@@ -159,48 +170,68 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 	return s.Server.Serve(listener)
 }
 
-// setupOAuth uses an OAuth2 client ID&secret to mint an API key and
-// to ensure the requested node name is free. It returns the created
-// auth key.
-func (s *TailnetSSH) setupOAuth(ctx context.Context, clientID, clientSecret string) (string, error) {
-	// Welp, tailscale do not want external folks to use this, but I don't _not_ want to use this:
-	tailscale.I_Acknowledge_This_API_Is_Unstable = true
+func (s *TailnetSSH) setupTSClient(ctx context.Context) (*tailscale.Client, error) {
+	tailscale.I_Acknowledge_This_API_Is_Unstable = true // needed in order to use API clients.
+	apiKey := os.Getenv("TS_API_KEY")
+	if apiKey != "" {
+		return tailscale.NewClient("-", tailscale.APIKey(apiKey)), nil
+	}
 
+	clientID := os.Getenv("TS_API_CLIENT_ID")
+	clientSecret := os.Getenv("TS_API_CLIENT_SECRET")
 	baseURL := cmp.Or(os.Getenv("TS_BASE_URL"), "https://api.tailscale.com")
+	tsClient := tailscale.NewClient("-", nil)
+	tsClient.BaseURL = baseURL
+	if clientID == "" || clientSecret == "" {
+		return nil, fmt.Errorf("neither TS_API_KEY, nor TS_API_CLIENT_ID and TS_API_CLIENT_SECRET are set")
+	}
 	credentials := clientcredentials.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		TokenURL:     baseURL + "/api/v2/oauth/token",
+		TokenURL:     tsClient.BaseURL + "/api/v2/oauth/token",
 		Scopes:       []string{"device"},
 	}
-	tsClient := tailscale.NewClient("-", nil)
 	tsClient.HTTPClient = credentials.Client(ctx)
-	tsClient.BaseURL = baseURL
+	return tsClient, nil
+}
+
+func (s *TailnetSSH) mintAuthKey(ctx context.Context) (string, *tailscale.Client, error) {
+	tsClient, err := s.setupTSClient(ctx)
+	if err != nil {
+		return "", nil, err
+	}
 	caps := tailscale.KeyCapabilities{
 		Devices: tailscale.KeyDeviceCapabilities{
 			Create: tailscale.KeyDeviceCreateCapabilities{
-				Tags: s.tags,
+				Tags:      s.tags,
+				Ephemeral: true,
 			},
 		},
 	}
 
 	authkey, _, err := tsClient.CreateKey(ctx, caps)
 	if err != nil {
-		return "", fmt.Errorf("minting a tailscale pre-authenticated key: %w", err)
+		return "", nil, fmt.Errorf("minting a tailscale pre-authenticated key: %w", err)
 	}
+	return authkey, tsClient, nil
+}
 
-	// Now that we have an auth key, clean out the node list so our name is free:
+func (s *TailnetSSH) cleanupOldNodes(ctx context.Context, tsClient *tailscale.Client) error {
 	devs, err := tsClient.Devices(ctx, tailscale.DeviceAllFields)
 	if err != nil {
-		return "", fmt.Errorf("listing existing devices: %w", err)
+		return fmt.Errorf("listing existing devices: %w", err)
 	}
 	for _, dev := range devs {
-		if dev.Hostname == s.serviceName {
-			log.Println("There already is a device named %q: %v", s.serviceName, dev.LastSeen)
+		lastSeen, _ := time.Parse(time.RFC3339, dev.LastSeen)
+		if dev.Hostname == s.serviceName && time.Since(lastSeen) > s.maxNodeAge {
+			log.Printf("node %v was last seen %v, evicting", dev.Name, lastSeen)
+			err := tsClient.DeleteDevice(ctx, dev.DeviceID)
+			if err != nil {
+				return fmt.Errorf("deleting device %q: %w", dev.DeviceID, err)
+			}
 		}
 	}
-
-	return authkey, nil
+	return nil
 }
 
 func setWinsize(f *os.File, w, h int) {
