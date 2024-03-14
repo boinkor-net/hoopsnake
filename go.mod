@@ -1,4 +1,4 @@
-module github.com/antifuchs/hoopsnake
+module github.com/boinkor-net/hoopsnake
 
 go 1.22.0
 
