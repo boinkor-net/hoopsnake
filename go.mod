@@ -9,6 +9,7 @@ require (
 	github.com/gliderlabs/ssh v0.3.6
 	github.com/peterbourgon/ff/v3 v3.4.0
 	golang.org/x/crypto v0.19.0
+	golang.org/x/oauth2 v0.16.0
 	tailscale.com v1.62.0
 )
 
@@ -39,6 +40,7 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.1-0.20230522191255-76236955d466 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/btree v1.1.2 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/nftables v0.1.1-0.20230115205135-9aa6fdf5a28c // indirect
@@ -88,6 +90,8 @@ require (
 	golang.org/x/tools v0.17.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 	golang.zx2c4.com/wireguard/windows v0.5.3 // indirect
+	google.golang.org/appengine v1.6.8 // indirect
+	google.golang.org/protobuf v1.32.0 // indirect
 	gvisor.dev/gvisor v0.0.0-20240306221502-ee1e1f6070e3 // indirect
 	nhooyr.io/websocket v1.8.10 // indirect
 )

@@ -1,6 +1,7 @@
 package spidereffer
 
 import (
+	"cmp"
 	"context"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -16,6 +18,8 @@ import (
 	"github.com/gliderlabs/ssh"
 	"github.com/peterbourgon/ff/v3/ffcli"
 	gossh "golang.org/x/crypto/ssh"
+	"golang.org/x/oauth2/clientcredentials"
+	"tailscale.com/client/tailscale"
 	"tailscale.com/tsnet"
 	"tailscale.com/types/logger"
 )
@@ -31,6 +35,7 @@ type TailnetSSH struct {
 	hostKeyFile       string
 	authorizedKeyFile string
 	tsnetVerbose      bool
+	tags              []string
 	command           []string
 }
 
@@ -43,8 +48,10 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	fs.StringVar(&s.hostKeyFile, "hostKey", "", "Pathname to the SSH host key")
 	fs.StringVar(&s.authorizedKeyFile, "authorizedKeys", "", "Pathname to a file listing authorized client keys")
 	fs.BoolVar(&s.tsnetVerbose, "tsnetVerbose", false, "Log tsnet messages verbosely")
+	var tags string
+	fs.StringVar(&tags, "tags", "", "Tailnet ACL tags assigned to the node, comma-separated")
 	root := &ffcli.Command{
-		ShortUsage: fmt.Sprintf("%s -name <serviceName> [flags] <command> [argv ...]", path.Base(args[0])),
+		ShortUsage: fmt.Sprintf("%s -name <serviceName> -tags <tags> [flags] <command> [argv ...]", path.Base(args[0])),
 		FlagSet:    fs,
 		Exec:       func(context.Context, []string) error { return nil },
 	}
@@ -64,6 +71,11 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.tags = strings.Split(tags, ",")
+	if len(s.tags) == 0 {
+		return nil, fmt.Errorf("service must have at least one ACL tag")
+	}
+
 	s.command = root.FlagSet.Args()
 	if len(s.command) == 0 {
 		return nil, fmt.Errorf("ssh connections must run a command - pass that as the remaining cli arguments")
@@ -125,6 +137,15 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 	if s.tsnetVerbose {
 		srv.Logf = log.Printf
 	}
+	clientID := os.Getenv("TS_API_CLIENT_ID")
+	clientSecret := os.Getenv("TS_API_CLIENT_SECRET")
+	if clientID != "" && clientSecret != "" {
+		authKey, err := s.setupOAuth(ctx, clientID, clientSecret)
+		if err != nil {
+			return fmt.Errorf("could not setup with oauth2: %w", err)
+		}
+		srv.AuthKey = authKey
+	}
 
 	_, err := srv.Up(ctx)
 	if err != nil {
@@ -136,6 +157,50 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 	}
 	log.Printf("starting ssh server on port :22...")
 	return s.Server.Serve(listener)
+}
+
+// setupOAuth uses an OAuth2 client ID&secret to mint an API key and
+// to ensure the requested node name is free. It returns the created
+// auth key.
+func (s *TailnetSSH) setupOAuth(ctx context.Context, clientID, clientSecret string) (string, error) {
+	// Welp, tailscale do not want external folks to use this, but I don't _not_ want to use this:
+	tailscale.I_Acknowledge_This_API_Is_Unstable = true
+
+	baseURL := cmp.Or(os.Getenv("TS_BASE_URL"), "https://api.tailscale.com")
+	credentials := clientcredentials.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		TokenURL:     baseURL + "/api/v2/oauth/token",
+		Scopes:       []string{"device"},
+	}
+	tsClient := tailscale.NewClient("-", nil)
+	tsClient.HTTPClient = credentials.Client(ctx)
+	tsClient.BaseURL = baseURL
+	caps := tailscale.KeyCapabilities{
+		Devices: tailscale.KeyDeviceCapabilities{
+			Create: tailscale.KeyDeviceCreateCapabilities{
+				Tags: s.tags,
+			},
+		},
+	}
+
+	authkey, _, err := tsClient.CreateKey(ctx, caps)
+	if err != nil {
+		return "", fmt.Errorf("minting a tailscale pre-authenticated key: %w", err)
+	}
+
+	// Now that we have an auth key, clean out the node list so our name is free:
+	devs, err := tsClient.Devices(ctx, tailscale.DeviceAllFields)
+	if err != nil {
+		return "", fmt.Errorf("listing existing devices: %w", err)
+	}
+	for _, dev := range devs {
+		if dev.Hostname == s.serviceName {
+			log.Println("There already is a device named %q: %v", s.serviceName, dev.LastSeen)
+		}
+	}
+
+	return authkey, nil
 }
 
 func setWinsize(f *os.File, w, h int) {
