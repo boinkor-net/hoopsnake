@@ -9,14 +9,14 @@
         go-sri-hashes.default = {};
 
         packages = {
-          default = config.packages.spidereffer;
-          spidereffer = pkgs.buildGo122Module rec {
-            pname = "spidereffer";
+          default = config.packages.hoopsnake;
+          hoopsnake = pkgs.buildGo122Module rec {
+            pname = "hoopsnake";
             version = "0.0.0";
             vendorHash = (builtins.readFile ./default.sri);
-            subPackages = ["cmd/spidereffer"];
+            subPackages = ["cmd/hoopsnake"];
             src = lib.sourceFilesBySuffices (lib.sources.cleanSource ./.) [".go" ".mod" ".sum"];
-            meta.mainProgram = "spidereffer";
+            meta.mainProgram = "hoopsnake";
           };
         };
       };

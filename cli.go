@@ -1,4 +1,4 @@
-package spidereffer
+package hoopsnake
 
 import (
 	"cmp"
@@ -45,9 +45,9 @@ type TailnetSSH struct {
 // / TailnetSSHFromArgs parses CLI arguments and constructs a validated TailnetSSH structure.
 func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	s := &TailnetSSH{}
-	fs := flag.NewFlagSet("spidereffer", flag.ExitOnError)
+	fs := flag.NewFlagSet("hoopsnake", flag.ExitOnError)
 	fs.StringVar(&s.serviceName, "name", "", "Machine name to set on the tailnet")
-	fs.StringVar(&s.stateDir, "stateDir", "", "Directory where spidereffer stores tsnet state")
+	fs.StringVar(&s.stateDir, "stateDir", "", "Directory where hoopsnake stores tsnet state")
 	fs.StringVar(&s.hostKeyFile, "hostKey", "", "Pathname to the SSH host key")
 	fs.StringVar(&s.authorizedKeyFile, "authorizedKeys", "", "Pathname to a file listing authorized client keys")
 	fs.BoolVar(&s.tsnetVerbose, "tsnetVerbose", false, "Log tsnet messages verbosely")

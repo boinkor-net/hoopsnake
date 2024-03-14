@@ -1,4 +1,4 @@
-module github.com/antifuchs/spidereffer
+module github.com/antifuchs/hoopsnake
 
 go 1.22.0
 

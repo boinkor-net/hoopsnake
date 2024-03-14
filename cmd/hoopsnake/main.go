@@ -5,12 +5,12 @@ import (
 	"log"
 	"os"
 
-	"github.com/antifuchs/spidereffer"
+	"github.com/antifuchs/hoopsnake"
 	// _ "tailscale.com/tsnet"
 )
 
 func main() {
-	cli, err := spidereffer.TailnetSSHFromArgs(os.Args)
+	cli, err := hoopsnake.TailnetSSHFromArgs(os.Args)
 	if err != nil {
 		log.Fatalf("Invalid command line: %v", err)
 	}
