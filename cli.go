@@ -139,7 +139,11 @@ func (s *TailnetSSH) handle(sess ssh.Session) {
 			io.Copy(f, sess) // stdin
 		}()
 		io.Copy(sess, f) // stdout
-		cmd.Wait()
+		err = cmd.Wait()
+		if err != nil {
+			log.Printf("Error waiting for the command: %v", err)
+			return
+		}
 	} else {
 		cmd.Stdin = sess
 		cmd.Stdout = sess
@@ -149,6 +153,10 @@ func (s *TailnetSSH) handle(sess ssh.Session) {
 			log.Printf("Error starting the command without a PTY: %v", err)
 			return
 		}
-		cmd.Wait()
+		err = cmd.Wait()
+		if err != nil {
+			log.Printf("Error waiting for the command: %v", err)
+			return
+		}
 	}
 }
