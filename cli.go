@@ -16,6 +16,8 @@ import (
 	"github.com/gliderlabs/ssh"
 	"github.com/peterbourgon/ff/v3/ffcli"
 	gossh "golang.org/x/crypto/ssh"
+	"tailscale.com/tsnet"
+	"tailscale.com/types/logger"
 )
 
 // TailnetSSH defines an SSH service that listens on a tailnet and runs a given shell program.
@@ -25,8 +27,10 @@ import (
 type TailnetSSH struct {
 	ssh.Server
 	serviceName       string
+	stateDir          string
 	hostKeyFile       string
 	authorizedKeyFile string
+	tsnetVerbose      bool
 	command           []string
 }
 
@@ -35,8 +39,10 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	s := &TailnetSSH{}
 	fs := flag.NewFlagSet("spidereffer", flag.ExitOnError)
 	fs.StringVar(&s.serviceName, "name", "", "Machine name to set on the tailnet")
+	fs.StringVar(&s.stateDir, "stateDir", "", "Directory where spidereffer stores tsnet state")
 	fs.StringVar(&s.hostKeyFile, "hostKey", "", "Pathname to the SSH host key")
 	fs.StringVar(&s.authorizedKeyFile, "authorizedKeys", "", "Pathname to a file listing authorized client keys")
+	fs.BoolVar(&s.tsnetVerbose, "tsnetVerbose", false, "Log tsnet messages verbosely")
 	root := &ffcli.Command{
 		ShortUsage: fmt.Sprintf("%s -name <serviceName> [flags] <command> [argv ...]", path.Base(args[0])),
 		FlagSet:    fs,
@@ -110,9 +116,26 @@ func (s *TailnetSSH) setupHostKey() error {
 func (s *TailnetSSH) Run(ctx context.Context) error {
 	s.Server.Handler = s.handle
 
-	s.Server.Addr = "127.0.0.1:2222"
-	log.Printf("starting ssh server on port %s...", s.Server.Addr)
-	return s.Server.ListenAndServe()
+	srv := &tsnet.Server{
+		Hostname:   s.serviceName,
+		Dir:        s.stateDir,
+		Logf:       logger.Discard,
+		ControlURL: os.Getenv("TS_URL"),
+	}
+	if s.tsnetVerbose {
+		srv.Logf = log.Printf
+	}
+
+	_, err := srv.Up(ctx)
+	if err != nil {
+		return fmt.Errorf("could not connect to tailnet: %w", err)
+	}
+	listener, err := srv.Listen("tcp", ":22")
+	if err != nil {
+		return fmt.Errorf("could not listen on tailnet: %w", err)
+	}
+	log.Printf("starting ssh server on port :22...")
+	return s.Server.Serve(listener)
 }
 
 func setWinsize(f *os.File, w, h int) {
