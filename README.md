@@ -4,6 +4,10 @@ If you live in the 2020, your Linux servers probably have encrypted storage. Tha
 
 I do that too, but I really dislike the idea of having yet another highly-privileged network service that's written in a memory unsafe language listen on the public internet this early in the boot process. So here's a dropbear alternative: hoopsnake.
 
+## Docs
+
+* [Authentication](docs/authentication.md)
+
 ## What you get
 
 Hoopsnake can do the following:
