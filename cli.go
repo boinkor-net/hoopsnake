@@ -7,8 +7,12 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path"
+	"syscall"
+	"unsafe"
 
+	"github.com/creack/pty"
 	"github.com/gliderlabs/ssh"
 	"github.com/peterbourgon/ff/v3/ffcli"
 	gossh "golang.org/x/crypto/ssh"
@@ -23,6 +27,7 @@ type TailnetSSH struct {
 	serviceName       string
 	hostKeyFile       string
 	authorizedKeyFile string
+	command           []string
 }
 
 // / TailnetSSHFromArgs parses CLI arguments and constructs a validated TailnetSSH structure.
@@ -33,7 +38,7 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	fs.StringVar(&s.hostKeyFile, "hostKey", "", "Pathname to the SSH host key")
 	fs.StringVar(&s.authorizedKeyFile, "authorizedKeys", "", "Pathname to a file listing authorized client keys")
 	root := &ffcli.Command{
-		ShortUsage: fmt.Sprintf("%s -name <serviceName> [flags] <toURL>", path.Base(args[0])),
+		ShortUsage: fmt.Sprintf("%s -name <serviceName> [flags] <command> [argv ...]", path.Base(args[0])),
 		FlagSet:    fs,
 		Exec:       func(context.Context, []string) error { return nil },
 	}
@@ -52,6 +57,10 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	err = s.setupHostKey()
 	if err != nil {
 		return nil, err
+	}
+	s.command = root.FlagSet.Args()
+	if len(s.command) == 0 {
+		return nil, fmt.Errorf("ssh connections must run a command - pass that as the remaining cli arguments")
 	}
 
 	return s, nil
@@ -106,8 +115,32 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 	return s.Server.ListenAndServe()
 }
 
+func setWinsize(f *os.File, w, h int) {
+	syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(syscall.TIOCSWINSZ),
+		uintptr(unsafe.Pointer(&struct{ h, w, x, y uint16 }{uint16(h), uint16(w), 0, 0})))
+}
+
 func (s *TailnetSSH) handle(sess ssh.Session) {
-	authorizedKey := gossh.MarshalAuthorizedKey(sess.PublicKey())
-	io.WriteString(sess, fmt.Sprintf("public key used by %s:\n", sess.User()))
-	sess.Write(authorizedKey)
+	cmd := exec.Command(s.command[0], s.command[1:]...)
+	ptyReq, winCh, isPty := sess.Pty()
+	if isPty {
+		cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
+		f, err := pty.Start(cmd)
+		if err != nil {
+			panic(err)
+		}
+		go func() {
+			for win := range winCh {
+				setWinsize(f, win.Width, win.Height)
+			}
+		}()
+		go func() {
+			io.Copy(f, sess) // stdin
+		}()
+		io.Copy(sess, f) // stdout
+		cmd.Wait()
+	} else {
+		io.WriteString(sess, "No PTY requested.\n")
+		sess.Exit(1)
+	}
 }

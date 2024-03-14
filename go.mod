@@ -5,6 +5,7 @@ go 1.22.0
 toolchain go1.22.1
 
 require (
+	github.com/creack/pty v1.1.21
 	github.com/gliderlabs/ssh v0.3.6
 	github.com/peterbourgon/ff/v3 v3.4.0
 	golang.org/x/crypto v0.19.0
