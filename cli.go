@@ -127,7 +127,8 @@ func (s *TailnetSSH) handle(sess ssh.Session) {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
 		f, err := pty.Start(cmd)
 		if err != nil {
-			panic(err)
+			log.Printf("Error starting the command in a PTY: %v", err)
+			return
 		}
 		go func() {
 			for win := range winCh {
@@ -140,7 +141,14 @@ func (s *TailnetSSH) handle(sess ssh.Session) {
 		io.Copy(sess, f) // stdout
 		cmd.Wait()
 	} else {
-		io.WriteString(sess, "No PTY requested.\n")
-		sess.Exit(1)
+		cmd.Stdin = sess
+		cmd.Stdout = sess
+		cmd.Stderr = sess
+		err := cmd.Start()
+		if err != nil {
+			log.Printf("Error starting the command without a PTY: %v", err)
+			return
+		}
+		cmd.Wait()
 	}
 }
