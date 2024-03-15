@@ -42,6 +42,10 @@ type TailnetSSH struct {
 	command           []string
 }
 
+var ErrMissingServiceName = fmt.Errorf("service name must be set via -name")
+var ErrMissingACLTag = fmt.Errorf("service must have at least one ACL tag")
+var ErrMissingCommand = fmt.Errorf("ssh connections must run a command - pass that as the remaining cli arguments")
+
 // / TailnetSSHFromArgs parses CLI arguments and constructs a validated TailnetSSH structure.
 func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	s := &TailnetSSH{}
@@ -66,7 +70,7 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	}
 
 	if s.serviceName == "" {
-		return nil, fmt.Errorf("service name must be set via -name")
+		return nil, ErrMissingServiceName
 	}
 
 	err := s.setupAuthorizedKeys()
@@ -79,12 +83,12 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	}
 	s.tags = strings.Split(tags, ",")
 	if len(s.tags) == 0 {
-		return nil, fmt.Errorf("service must have at least one ACL tag")
+		return nil, ErrMissingACLTag
 	}
 
 	s.command = root.FlagSet.Args()
 	if len(s.command) == 0 {
-		return nil, fmt.Errorf("ssh connections must run a command - pass that as the remaining cli arguments")
+		return nil, ErrMissingCommand
 	}
 
 	return s, nil
@@ -185,6 +189,8 @@ func (s *TailnetSSH) Run(ctx context.Context, quit <-chan os.Signal) error {
 	return nil
 }
 
+var ErrNoAPIKeys = fmt.Errorf("neither TS_API_KEY, nor TS_API_CLIENT_ID and TS_API_CLIENT_SECRET are set")
+
 func (s *TailnetSSH) setupTSClient(ctx context.Context) (*tailscale.Client, error) {
 	tailscale.I_Acknowledge_This_API_Is_Unstable = true // needed in order to use API clients.
 	apiKey := os.Getenv("TS_API_KEY")
@@ -198,7 +204,7 @@ func (s *TailnetSSH) setupTSClient(ctx context.Context) (*tailscale.Client, erro
 	tsClient := tailscale.NewClient("-", nil)
 	tsClient.BaseURL = baseURL
 	if clientID == "" || clientSecret == "" {
-		return nil, fmt.Errorf("neither TS_API_KEY, nor TS_API_CLIENT_ID and TS_API_CLIENT_SECRET are set")
+		return nil, ErrNoAPIKeys
 	}
 	credentials := clientcredentials.Config{
 		ClientID:     clientID,
