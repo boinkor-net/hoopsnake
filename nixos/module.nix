@@ -1,4 +1,7 @@
-{withSystem}: {
+# importApply arguments:
+{withSystem}:
+# Regular NixOS module arguments:
+{
   lib,
   pkgs,
   config,
@@ -63,10 +66,10 @@
     config,
     lib,
     ...
-  }:
-    lib.mkIf cfg.enable (let
-      cfg = config.initrd.hoopsnake;
-    in {
+  }: (let
+    cfg = config.initrd.hoopsnake;
+  in
+    lib.mkIf cfg.enable {
       boot.initrd.network.postCommands = ''
         . /etc/hoopsnake/tailscale/environment
         export TS_AUTHKEY TS_API_KEY TS_API_CLIENT_ID TS_API_CLIENT_SECRET TS_BASE_URL

@@ -11,6 +11,7 @@
       imports = [
         inputs.devshell.flakeModule
         inputs.generate-go-sri.flakeModules.default
+        ./nixos/tests/flake-part.nix
       ];
       systems = ["x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin"];
       perSystem = {
@@ -46,7 +47,7 @@
         };
       };
 
-      flake.nixosModules.default = importApply ./nixos/module.nix {
+      flake.nixosModules.default = import ./nixos/module.nix {
         inherit withSystem;
       };
     });
