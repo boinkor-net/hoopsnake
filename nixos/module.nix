@@ -62,12 +62,8 @@
     };
   };
 
-  config = {
-    config,
-    lib,
-    ...
-  }: (let
-    cfg = config.initrd.hoopsnake;
+  config = let
+    cfg = config.boot.initrd.hoopsnake;
   in
     lib.mkIf cfg.enable {
       boot.initrd.network.postCommands = ''
@@ -87,5 +83,5 @@
         "/etc/hoopsnake/ssh/authorized_keys" = cfg.ssh.authorizedKeysFile;
         "/etc/hoopsnake/tailscale/environment" = cfg.tailscale.environmentFile;
       };
-    });
+    };
 }

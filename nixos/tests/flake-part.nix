@@ -23,7 +23,7 @@
             alice = {...}: {
               environment.systemPackages = [pkgs.hello];
               imports = [
-                #  self.nixosModules.default
+                self.nixosModules.default
               ];
             };
             bob = {};
