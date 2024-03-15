@@ -2,3 +2,4 @@
 /authorized_keys
 /hostkey*
 /known_hosts*
+/.envrc

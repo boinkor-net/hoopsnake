@@ -2,6 +2,7 @@
   outputs = inputs @ {flake-parts, ...}:
     flake-parts.lib.mkFlake {inherit inputs;} {
       imports = [
+        inputs.devshell.flakeModule
         inputs.generate-go-sri.flakeModules.default
       ];
       systems = ["x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin"];
@@ -24,6 +25,17 @@
             src = lib.sourceFilesBySuffices (lib.sources.cleanSource ./.) [".go" ".mod" ".sum"];
             meta.mainProgram = "hoopsnake";
           };
+        };
+
+        devshells.default = {
+          commands = [
+          ];
+          packages = [
+            pkgs.go_1_22
+            pkgs.gopls
+            (pkgs.golangci-lint.override
+              {buildGoModule = args: (pkgs.buildGo122Module args);})
+          ];
         };
       };
     };
