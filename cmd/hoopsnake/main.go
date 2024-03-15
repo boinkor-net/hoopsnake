@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/boinkor-net/hoopsnake"
-	// _ "tailscale.com/tsnet"
 )
 
 func main() {
