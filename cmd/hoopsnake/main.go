@@ -4,8 +4,10 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/antifuchs/hoopsnake"
+	"github.com/boinkor-net/hoopsnake"
 	// _ "tailscale.com/tsnet"
 )
 
@@ -15,6 +17,12 @@ func main() {
 		log.Fatalf("Invalid command line: %v", err)
 	}
 
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+
 	ctx := context.Background()
-	log.Fatal(cli.Run(ctx))
+	err = cli.Run(ctx, c)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

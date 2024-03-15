@@ -131,7 +131,7 @@ func (s *TailnetSSH) setupHostKey() error {
 //
 // If Run returns an error, that means it can no longer listen - these
 // errors are fatal.
-func (s *TailnetSSH) Run(ctx context.Context) error {
+func (s *TailnetSSH) Run(ctx context.Context, quit <-chan os.Signal) error {
 	var err error
 	s.Server.Handler = s.handle
 
@@ -162,12 +162,27 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not connect to tailnet: %w", err)
 	}
+	defer srv.Close()
+
 	listener, err := srv.Listen("tcp", ":22")
 	if err != nil {
 		return fmt.Errorf("could not listen on tailnet: %w", err)
 	}
+
+	terminated := false
+	go func() {
+		signal := <-quit
+		terminated = true
+		log.Printf("Received signal %v, terminating...", signal)
+		srv.Close()
+	}()
+
 	log.Printf("starting ssh server on port :22...")
-	return s.Server.Serve(listener)
+	err = s.Server.Serve(listener)
+	if err != nil && !terminated {
+		return fmt.Errorf("ssh server failed serving: %w", err)
+	}
+	return nil
 }
 
 func (s *TailnetSSH) setupTSClient(ctx context.Context) (*tailscale.Client, error) {
@@ -223,12 +238,18 @@ func (s *TailnetSSH) cleanupOldNodes(ctx context.Context, tsClient *tailscale.Cl
 	}
 	for _, dev := range devs {
 		lastSeen, _ := time.Parse(time.RFC3339, dev.LastSeen)
-		if dev.Hostname == s.serviceName && time.Since(lastSeen) > s.maxNodeAge {
-			log.Printf("node %v was last seen %v, evicting", dev.Name, lastSeen)
-			err := tsClient.DeleteDevice(ctx, dev.DeviceID)
-			if err != nil {
-				return fmt.Errorf("deleting device %q: %w", dev.DeviceID, err)
-			}
+		if dev.Hostname != s.serviceName {
+			continue
+		}
+		recency := time.Since(lastSeen)
+		if recency < s.maxNodeAge {
+			log.Printf("node %q/%q was seen %v ago, not evicting.", dev.Name, dev.DeviceID, recency)
+			continue
+		}
+		log.Printf("node %v was last seen %v, evicting", dev.Name, lastSeen)
+		err := tsClient.DeleteDevice(ctx, dev.DeviceID)
+		if err != nil {
+			return fmt.Errorf("deleting device %q: %w", dev.DeviceID, err)
 		}
 	}
 	return nil
