@@ -157,7 +157,10 @@ func (s *TailnetSSH) Run(ctx context.Context, quit <-chan os.Signal) error {
 			return fmt.Errorf("could not mint auth key: %w", err)
 		}
 		if s.deleteExisting {
-			s.cleanupOldNodes(ctx, tsClient)
+			err = s.cleanupOldNodes(ctx, tsClient)
+			if err != nil {
+				return fmt.Errorf("could not clean up old nodes: %w", err)
+			}
 		}
 	}
 	srv.AuthKey = authKey
@@ -262,7 +265,7 @@ func (s *TailnetSSH) cleanupOldNodes(ctx context.Context, tsClient *tailscale.Cl
 }
 
 func setWinsize(f *os.File, w, h int) {
-	syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(syscall.TIOCSWINSZ),
+	_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(syscall.TIOCSWINSZ),
 		uintptr(unsafe.Pointer(&struct{ h, w, x, y uint16 }{uint16(h), uint16(w), 0, 0})))
 }
 
@@ -284,9 +287,13 @@ func (s *TailnetSSH) handle(sess ssh.Session) {
 			}
 		}()
 		go func() {
-			io.Copy(f, sess) // stdin
+			_, err := io.Copy(f, sess) // stdin
+			if err != nil {
+				log.Printf("Received error piping into process stdin, closing connection: %v", err)
+				sess.Close()
+			}
 		}()
-		io.Copy(sess, f) // stdout
+		_, _ = io.Copy(sess, f) // stdout; we don't care if there's an error
 		err = cmd.Wait()
 		if err != nil {
 			log.Printf("Error waiting for the command: %v", err)
