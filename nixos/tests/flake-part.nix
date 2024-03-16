@@ -35,12 +35,16 @@
       # Unfortunately, headscale doesn't support oauth client id/secret yet.
     };
     dbDump = pkgs.writeText "generated_keys.sql" ''
+      .timeout 5000
       INSERT INTO pre_auth_keys VALUES(90,'e01aa49edded75748e17903330e3f18c25496b47360ffdec',1,0,0,0,datetime(),datetime('now','+1 hour'));
       INSERT INTO api_keys VALUES(90,'OVehtREWXA',X'24326124313024436f72666574456a30774973344c3745616e697234756e2e536c6746654e71527030694448596153594968355a65374f6742513061',datetime(),datetime('now','+1 hour'),NULL);
     '';
     hostkey = pkgs.runCommand "hostkey" {buildInputs = [pkgs.openssh];} ''
       mkdir $out
       ssh-keygen -N "" -t ed25519 -f $out/hostkey
+    '';
+    knownHosts = pkgs.runCommand "known_hosts" {} ''
+      (echo -n 'alice-boot ' ; cat ${hostkey}/hostkey.pub) > $out
     '';
     clientKey = pkgs.runCommand "clientKey" {buildInputs = [pkgs.openssh];} ''
       mkdir $out
@@ -56,13 +60,9 @@
         "ip=${config.networking.primaryIPAddress}:::255.255.255.0::eth1:off"
       ];
       boot.initrd.preLVMCommands = ''
-        while true; do
-            if [ -f fnord ]; then
-              poweroff
-            fi
-            echo "Waiting to be told to shutdown"
+        while ! [ -f /tmp/fnord ] ; do
             sleep 1
-          done
+        done
       '';
       boot.initrd.network = {
         enable = true;
@@ -131,15 +131,38 @@
             peer = {
               services.tailscale.enable = true;
               security.pki.certificateFiles = ["${tls-cert}/cert.pem"];
+              networking.useDHCP = false;
+              environment.etc.sshKey = {
+                source = "${clientKey}/client";
+                mode = "0600";
+              };
+              environment.systemPackages = [
+                (pkgs.writeShellApplication {
+                  name = "ssh-to-alice";
+                  runtimeInputs = [pkgs.openssh];
+                  text = ''
+                    echo | ssh -vvv -o UserKnownHostsFile=${knownHosts} -i /etc/sshKey shell@alice-boot
+                  '';
+                })
+              ];
             };
-            alice = {...}: {
+            alice = {
+              lib,
+              config,
+              ...
+            }: {
               imports = [bootloader self.nixosModules.default];
+              services.tailscale.enable = true;
               boot.initrd.network = {
                 hoopsnake = {
                   enable = true;
                   ssh = {
                     authorizedKeysFile = "${clientKey}/client.pub";
                     privateHostKey = "${hostkey}/hostkey";
+                    shell = lib.getExe (pkgs.writeShellApplication {
+                      name = "success";
+                      text = "touch /tmp/fnord";
+                    });
                   };
                   tailscale = {
                     name = "alice-boot";
@@ -169,6 +192,9 @@
 
             alice.start()
             peer.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
+            print(peer.succeed("ip a ; ip r"))
+            peer.succeed("ssh-to-alice", timeout=90)
+            alice.wait_for_unit("multi-user.target")
           '';
         };
       };
