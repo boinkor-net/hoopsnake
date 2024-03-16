@@ -128,7 +128,7 @@
           name = "hoopsnake-starts";
           nodes = {
             inherit headscale;
-            peer = {
+            bob = {
               services.tailscale.enable = true;
               security.pki.certificateFiles = ["${tls-cert}/cert.pem"];
               networking.useDHCP = false;
@@ -176,24 +176,24 @@
           };
 
           testScript = ''
-            for node in [headscale, peer]:
+            for node in [headscale, bob]:
                 node.start()
             headscale.wait_for_unit("headscale")
             headscale.wait_for_open_port(443)
 
             # Create headscale user and preauth-key
-            headscale.succeed("headscale users create peer")
-            authkey = headscale.succeed("headscale preauthkeys -u peer create --reusable")
+            headscale.succeed("headscale users create bob")
+            authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
 
             # Connect peers
             up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
-            peer.execute(up_cmd)
+            bob.execute(up_cmd)
             headscale.succeed("import-pregenerated-keys")
 
             alice.start()
-            peer.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
-            print(peer.succeed("ip a ; ip r"))
-            peer.succeed("ssh-to-alice", timeout=90)
+            bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
+            print(bob.succeed("ip a ; ip r"))
+            bob.succeed("ssh-to-alice", timeout=90)
             alice.wait_for_unit("multi-user.target")
           '';
         };
