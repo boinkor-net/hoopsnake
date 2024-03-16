@@ -67,7 +67,7 @@ func (s *TailnetSSH) Run(ctx context.Context, quit <-chan os.Signal) error {
 		Hostname:   s.serviceName,
 		Dir:        s.stateDir,
 		Logf:       logger.Discard,
-		ControlURL: os.Getenv("TS_URL"),
+		ControlURL: os.Getenv("TS_BASE_URL"),
 	}
 	if s.tsnetVerbose {
 		srv.Logf = log.Printf
