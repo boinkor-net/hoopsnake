@@ -192,9 +192,8 @@
 
             alice.start()
             bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
-            print(bob.succeed("ip a ; ip r"))
             bob.succeed("ssh-to-alice", timeout=90)
-            alice.wait_for_unit("multi-user.target")
+            alice.wait_for_unit("multi-user.target", timeout=90)
           '';
         };
       };
