@@ -131,11 +131,11 @@
         "tailscale": "tailscale"
       },
       "locked": {
-        "lastModified": 1710385539,
-        "narHash": "sha256-/WSbKYyot62g3MszMIvDoMDfYinQgaNHkwmoyqqxldc=",
+        "lastModified": 1710695349,
+        "narHash": "sha256-5tdsXc+xet3rXgUN8zdHt7+MsOhv6nOevJ5pehbz5YQ=",
         "owner": "antifuchs",
         "repo": "generate-go-sri",
-        "rev": "487346d73f0f517ec0ca8304951da97efd19652a",
+        "rev": "55942df1b377efbe07259e61e9d660cace2832b2",
         "type": "github"
       },
       "original": {
@@ -230,11 +230,11 @@
     },
     "nixpkgs_4": {
       "locked": {
-        "lastModified": 1710272261,
-        "narHash": "sha256-g0bDwXFmTE7uGDOs9HcJsfLFhH7fOsASbAuOzDC+fhQ=",
+        "lastModified": 1710631334,
+        "narHash": "sha256-rL5LSYd85kplL5othxK5lmAtjyMOBg390sGBTb3LRMM=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "0ad13a6833440b8e238947e47bea7f11071dc2b2",
+        "rev": "c75037bbf9093a2acb617804ee46320d6d1fea5a",
         "type": "github"
       },
       "original": {
