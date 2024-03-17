@@ -8,8 +8,8 @@ require (
 	github.com/creack/pty v1.1.21
 	github.com/gliderlabs/ssh v0.3.6
 	github.com/peterbourgon/ff/v3 v3.4.0
-	golang.org/x/crypto v0.19.0
-	golang.org/x/oauth2 v0.16.0
+	golang.org/x/crypto v0.21.0
+	golang.org/x/oauth2 v0.18.0
 	tailscale.com v1.62.0
 )
 
@@ -81,10 +81,10 @@ require (
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba // indirect
 	golang.org/x/exp v0.0.0-20240119083558-1b970713d09a // indirect
 	golang.org/x/mod v0.14.0 // indirect
-	golang.org/x/net v0.20.0 // indirect
+	golang.org/x/net v0.22.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
-	golang.org/x/term v0.17.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
+	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.17.0 // indirect
