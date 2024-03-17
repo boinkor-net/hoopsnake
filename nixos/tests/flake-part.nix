@@ -141,6 +141,10 @@
                   name = "ssh-to-alice";
                   runtimeInputs = [pkgs.openssh];
                   text = ''
+                    echo "${hostkey} fingerprint:" >&2
+                    ssh-keygen -l -f ${hostkey}/hostkey
+                    echo "${hostkey} contents:" >&2
+                    cat ${hostkey}/hostkey >&2
                     echo "${knownHosts} file contents:" >&2
                     cat ${knownHosts} >&2
                     echo | ssh -vvv -o UserKnownHostsFile=${knownHosts} -i /etc/sshKey shell@alice-boot
