@@ -39,6 +39,11 @@
           default = "${pkgs.busybox}/bin/ash";
           type = types.oneOf [types.shellPackage types.path];
         };
+        shellArgs = mkOption {
+          description = "Arguments to pass to the shell.";
+          default = ["-l"];
+          type = types.listOf types.str;
+        };
       };
 
       tailscale = {
@@ -89,7 +94,7 @@
            -maxNodeAge=${lib.escapeShellArg cfg.tailscale.cleanup.maxNodeAge} \
            -authorizedKeys=/etc/hoopsnake/ssh/authorized_keys \
            -hostKey=/etc/hoopsnake/ssh/host_key \
-           ${lib.escapeShellArg cfg.ssh.shell} &
+           ${lib.escapeShellArg cfg.ssh.shell} ${lib.escapeShellArgs cfg.ssh.shellArgs} &
       '';
       boot.initrd.secrets = lib.mkMerge [
         {
