@@ -131,11 +131,11 @@
         "tailscale": "tailscale"
       },
       "locked": {
-        "lastModified": 1710695349,
-        "narHash": "sha256-5tdsXc+xet3rXgUN8zdHt7+MsOhv6nOevJ5pehbz5YQ=",
+        "lastModified": 1710695721,
+        "narHash": "sha256-NnN/4PTfqNnqXPZT7lePWE9k0Lu3kvofkoDIe8XAvSM=",
         "owner": "antifuchs",
         "repo": "generate-go-sri",
-        "rev": "55942df1b377efbe07259e61e9d660cace2832b2",
+        "rev": "c7d30d1548d886a4987b0514545597c69a044283",
         "type": "github"
       },
       "original": {
