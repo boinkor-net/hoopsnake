@@ -42,9 +42,7 @@
     hostkey = pkgs.runCommand "hostkey" {buildInputs = [pkgs.openssh];} ''
       mkdir $out
       ssh-keygen -N "" -t ed25519 -f $out/hostkey
-    '';
-    knownHosts = pkgs.runCommand "known_hosts" {} ''
-      (echo -n 'alice-boot ' ; cat ${hostkey}/hostkey.pub) > $out
+      (echo -n 'alice-boot ' ; cat $out/hostkey.pub) > $out/known_hosts
     '';
     clientKey = pkgs.runCommand "clientKey" {buildInputs = [pkgs.openssh];} ''
       mkdir $out
@@ -145,9 +143,9 @@
                     ssh-keygen -l -f ${hostkey}/hostkey
                     echo "${hostkey} contents:" >&2
                     cat ${hostkey}/hostkey >&2
-                    echo "${knownHosts} file contents:" >&2
-                    cat ${knownHosts} >&2
-                    echo | ssh -vvv -o UserKnownHostsFile=${knownHosts} -i /etc/sshKey shell@alice-boot
+                    echo "${hostkey}/known_hosts file contents:" >&2
+                    cat ${hostkey}/known_hosts >&2
+                    echo | ssh -vvv -o UserKnownHostsFile=${hostkey}/known_hosts -i /etc/sshKey shell@alice-boot
                   '';
                 })
               ];
