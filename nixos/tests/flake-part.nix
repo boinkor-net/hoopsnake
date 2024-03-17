@@ -141,6 +141,8 @@
                   name = "ssh-to-alice";
                   runtimeInputs = [pkgs.openssh];
                   text = ''
+                    echo "${knownHosts} file contents:" >&2
+                    cat ${knownHosts} >&2
                     echo | ssh -vvv -o UserKnownHostsFile=${knownHosts} -i /etc/sshKey shell@alice-boot
                   '';
                 })
