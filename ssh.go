@@ -108,6 +108,10 @@ func (s *TailnetSSH) Run(ctx context.Context, quit <-chan os.Signal) error {
 		srv.Close()
 	}()
 
+	err = s.setupPrometheus(srv)
+	if err != nil {
+		log.Printf("Setting up prometheus failed, but continuing anyway: %v", err)
+	}
 	log.Printf("starting ssh server on port :22...")
 	err = s.Server.Serve(listener)
 	if err != nil && !terminated {
