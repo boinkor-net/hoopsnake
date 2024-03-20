@@ -13,13 +13,6 @@ import (
 	"tailscale.com/tsnet"
 )
 
-var (
-	runningIndicator = promauto.NewGaugeFunc(prometheus.GaugeOpts{
-		Name: "hoopsnake_running",
-		Help: "A counter set to 1.0 if hoopsnake is running.",
-	}, func() float64 { return 1.0 })
-)
-
 func (s *TailnetSSH) setupPrometheus(srv *tsnet.Server) error {
 	if s.prometheusAddr == "" {
 		return nil
@@ -38,11 +31,22 @@ func (s *TailnetSSH) setupPrometheus(srv *tsnet.Server) error {
 		log.Printf("Failed to listen on prometheus address: %v", server.Serve(listener))
 		os.Exit(20)
 	}()
+
+	v4, v6 := srv.TailscaleIPs()
+	promauto.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "hoopsnake_running",
+		Help: "A counter set to 1.0 if hoopsnake is running.",
+		ConstLabels: prometheus.Labels{
+			"ipv4":     v4.String(),
+			"ipv6":     v6.String(),
+			"hostname": srv.Hostname,
+		},
+	}, func() float64 { return 1.0 })
 	listenAddr := s.prometheusAddr
 	if listenAddr[0] == ':' {
-		v4, _ := srv.TailscaleIPs()
 		listenAddr = v4.String() + listenAddr
 	}
+
 	log.Printf("Serving prometheus metrics at http://%s/metrics", listenAddr)
 	return nil
 }
