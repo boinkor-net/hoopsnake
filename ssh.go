@@ -7,15 +7,25 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"syscall"
 	"unsafe"
 
 	"github.com/creack/pty"
 	"github.com/gliderlabs/ssh"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	gossh "golang.org/x/crypto/ssh"
 	"tailscale.com/client/tailscale"
 	"tailscale.com/tsnet"
 	"tailscale.com/types/logger"
+)
+
+var (
+	authentications = promauto.NewCounterVec(prometheus.CounterOpts{
+		Name: "hoopsnake_authentications",
+		Help: "Number of authentications attempted",
+	}, []string{"user", "pubkey_fpr", "pubkey", "success"})
 )
 
 func (s *TailnetSSH) setupAuthorizedKeys() error {
@@ -23,29 +33,36 @@ func (s *TailnetSSH) setupAuthorizedKeys() error {
 	if err != nil {
 		log.Fatalf("Could not read authorized keys file %q: %v", s.authorizedKeyFile, err)
 	}
-	var authorizedPubKeys []gossh.PublicKey
 	for len(authorizedKeysBytes) > 0 {
 		pubKey, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedKeysBytes)
 		if err != nil {
 			return fmt.Errorf("Could not parse authorized key: %w", err)
 		}
 
-		authorizedPubKeys = append(authorizedPubKeys, pubKey)
+		s.authorizedPubKeys = append(s.authorizedPubKeys, pubKey)
 		authorizedKeysBytes = rest
 	}
-	if len(authorizedPubKeys) > 0 {
-		s.Server.PublicKeyHandler = func(ctx ssh.Context, key ssh.PublicKey) bool {
-			log.Printf("Attempting auth for user %q with public key %q", ctx.User(), gossh.MarshalAuthorizedKey(key))
-			matched := false
-			for _, authorized := range authorizedPubKeys {
-				if ssh.KeysEqual(key, authorized) {
-					matched = true
-				}
-			}
-			return matched
-		}
+	if len(s.authorizedPubKeys) > 0 {
+		s.Server.PublicKeyHandler = s.validatePubkey
 	}
 	return nil
+}
+
+func (s *TailnetSSH) validatePubkey(ctx ssh.Context, key ssh.PublicKey) bool {
+	log.Printf("Attempting auth for user %q with public key %q", ctx.User(), gossh.MarshalAuthorizedKey(key))
+	matched := false
+	for _, authorized := range s.authorizedPubKeys {
+		if ssh.KeysEqual(key, authorized) {
+			matched = true
+		}
+	}
+	authentications.With(prometheus.Labels{
+		"user":       ctx.User(),
+		"pubkey":     string(gossh.MarshalAuthorizedKey(key)),
+		"pubkey_fpr": gossh.FingerprintSHA256(key),
+		"success":    strconv.FormatBool(matched),
+	}).Inc()
+	return matched
 }
 
 func (s *TailnetSSH) setupHostKey() error {
@@ -108,6 +125,10 @@ func (s *TailnetSSH) Run(ctx context.Context, quit <-chan os.Signal) error {
 		srv.Close()
 	}()
 
+	err = s.setupPrometheus(srv)
+	if err != nil {
+		log.Printf("Setting up prometheus failed, but continuing anyway: %v", err)
+	}
 	log.Printf("starting ssh server on port :22...")
 	err = s.Server.Serve(listener)
 	if err != nil && !terminated {

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gliderlabs/ssh"
 	"github.com/peterbourgon/ff/v3/ffcli"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 // TailnetSSH defines an SSH service that listens on a tailnet and runs a given shell program.
@@ -25,8 +26,10 @@ type TailnetSSH struct {
 	tsnetVerbose      bool
 	deleteExisting    bool
 	maxNodeAge        time.Duration
+	prometheusAddr    string
 	tags              []string
 	command           []string
+	authorizedPubKeys []gossh.PublicKey
 }
 
 var ErrMissingServiceName = fmt.Errorf("service name must be set via -name")
@@ -44,6 +47,7 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	fs.BoolVar(&s.tsnetVerbose, "tsnetVerbose", false, "Log tsnet messages verbosely")
 	fs.BoolVar(&s.deleteExisting, "deleteExisting", false, "Delete any down node with a conflicting name, if one exists")
 	fs.DurationVar(&s.maxNodeAge, "maxNodeAge", 30*time.Second, "Matching node must be offline at least this long if -deleteExisting is set")
+	fs.StringVar(&s.prometheusAddr, "prometheusAddr", ":9021", "Address on the tailnet node where prometheus requests get answered")
 
 	var tags string
 	fs.StringVar(&tags, "tags", "", "Tailnet ACL tags assigned to the node, comma-separated")
