@@ -10,6 +10,7 @@ import (
 
 	"github.com/gliderlabs/ssh"
 	"github.com/peterbourgon/ff/v3/ffcli"
+	gossh "golang.org/x/crypto/ssh"
 )
 
 // TailnetSSH defines an SSH service that listens on a tailnet and runs a given shell program.
@@ -28,6 +29,7 @@ type TailnetSSH struct {
 	prometheusAddr    string
 	tags              []string
 	command           []string
+	authorizedPubKeys []gossh.PublicKey
 }
 
 var ErrMissingServiceName = fmt.Errorf("service name must be set via -name")
