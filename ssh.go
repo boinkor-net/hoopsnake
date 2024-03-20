@@ -25,7 +25,7 @@ var (
 	authentications = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "hoopsnake_authentications",
 		Help: "Number of authentications attempted",
-	}, []string{"user", "pubkey", "success"})
+	}, []string{"user", "pubkey_fpr", "pubkey", "success"})
 )
 
 func (s *TailnetSSH) setupAuthorizedKeys() error {
@@ -57,9 +57,10 @@ func (s *TailnetSSH) validatePubkey(ctx ssh.Context, key ssh.PublicKey) bool {
 		}
 	}
 	authentications.With(prometheus.Labels{
-		"user":    ctx.User(),
-		"pubkey":  gossh.FingerprintSHA256(key),
-		"success": strconv.FormatBool(matched),
+		"user":       ctx.User(),
+		"pubkey":     string(gossh.MarshalAuthorizedKey(key)),
+		"pubkey_fpr": gossh.FingerprintSHA256(key),
+		"success":    strconv.FormatBool(matched),
 	}).Inc()
 	return matched
 }
