@@ -7,8 +7,17 @@ import (
 	"os"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"tailscale.com/tsnet"
+)
+
+var (
+	runningIndicator = promauto.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "hoopsnake_running",
+		Help: "A counter set to 1.0 if hoopsnake is running.",
+	}, func() float64 { return 1.0 })
 )
 
 func (s *TailnetSSH) setupPrometheus(srv *tsnet.Server) error {
