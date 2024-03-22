@@ -7,6 +7,7 @@ I do that too, but I really dislike the idea of having yet another highly-privil
 ## Docs
 
 * [Authentication](docs/authentication.md)
+* [Threat model](docs/threat-model.md)
 
 ## What you get
 
@@ -22,7 +23,7 @@ Hoopsnake can do the following:
 * No listening on the public internet. Tailscale (or tailscale with headscale if you like to self-host) is the easiest way to get a VPN that doesn't suck. Please give it a try.
 * No SSH extensions like scp/sftp. Too much trouble and I expect you'll only ssh in to type a command and immediately exit again.
 * No keyboard-interactive auth. Please use SSH keys. [Secretive](https://github.com/maxgoedjen/secretive) is great if you're on a mac.
-* No mitigation for initrd's storing the server's private keys and API tokens in plaintext (see [threat model](docs/authentication.md#key-management))
+* No mitigation for initrd's storing the server's private keys and API tokens in plaintext (see [threat model](docs/threat-model.md#key-management))
 * Hopefully no buffer overruns
 
 # How well does it work? Is it stable?
