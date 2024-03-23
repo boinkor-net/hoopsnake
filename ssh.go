@@ -17,6 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	gossh "golang.org/x/crypto/ssh"
 	"tailscale.com/client/tailscale"
+	"tailscale.com/ipn/store/mem"
 	"tailscale.com/tsnet"
 	"tailscale.com/types/logger"
 )
@@ -80,7 +81,13 @@ func (s *TailnetSSH) Run(ctx context.Context, quit <-chan os.Signal) error {
 	var err error
 	s.Server.Handler = s.handle
 
+	state, err := mem.New(nil, "")
+	if err != nil {
+		return fmt.Errorf("allocating in-memory state: %w", err)
+	}
 	srv := &tsnet.Server{
+		Store:      state,
+		Ephemeral:  true,
 		Hostname:   s.serviceName,
 		Dir:        s.stateDir,
 		Logf:       logger.Discard,
