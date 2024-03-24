@@ -26,18 +26,20 @@ var (
 )
 
 func (s *TailnetSSH) setupAuthorizedKeys() error {
-	authorizedKeysBytes, err := os.ReadFile(s.authorizedKeyFile)
-	if err != nil {
-		log.Fatalf("Could not read authorized keys file %q: %v", s.authorizedKeyFile, err)
-	}
-	for len(authorizedKeysBytes) > 0 {
-		pubKey, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedKeysBytes)
+	for _, path := range s.authorizedKeyFiles {
+		authorizedKeysBytes, err := os.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("Could not parse authorized key: %w", err)
+			log.Fatalf("Could not read authorized keys file %q: %v", path, err)
 		}
+		for len(authorizedKeysBytes) > 0 {
+			pubKey, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedKeysBytes)
+			if err != nil {
+				return fmt.Errorf("Could not parse authorized key: %w", err)
+			}
 
-		s.authorizedPubKeys = append(s.authorizedPubKeys, pubKey)
-		authorizedKeysBytes = rest
+			s.authorizedPubKeys = append(s.authorizedPubKeys, pubKey)
+			authorizedKeysBytes = rest
+		}
 	}
 	if len(s.authorizedPubKeys) > 0 {
 		s.Server.PublicKeyHandler = s.validatePubkey

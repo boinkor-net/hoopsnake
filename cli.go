@@ -16,23 +16,38 @@ import (
 	gossh "golang.org/x/crypto/ssh"
 )
 
+type paths []string
+
+func (p *paths) String() string {
+	return strings.Join(*p, ", ")
+}
+
+func (p *paths) Set(value string) error {
+	_, err := os.Stat(value)
+	if err != nil {
+		return fmt.Errorf("can not use %q: %w", value, err)
+	}
+	*p = append(*p, value)
+	return nil
+}
+
 // TailnetSSH defines an SSH service that listens on a tailnet and runs a given shell program.
 //
 // The zero value of TailnetSSH is not a valid instance. Use
 // TailnetSSHFromArgs to construct a valid one.
 type TailnetSSH struct {
 	ssh.Server
-	serviceName       string
-	stateDir          string
-	hostKeyFile       string
-	authorizedKeyFile string
-	tsnetVerbose      bool
-	deleteExisting    bool
-	maxNodeAge        time.Duration
-	prometheusAddr    string
-	tags              []string
-	command           []string
-	authorizedPubKeys []gossh.PublicKey
+	serviceName        string
+	stateDir           string
+	hostKeyFile        string
+	authorizedKeyFiles paths
+	tsnetVerbose       bool
+	deleteExisting     bool
+	maxNodeAge         time.Duration
+	prometheusAddr     string
+	tags               []string
+	command            []string
+	authorizedPubKeys  []gossh.PublicKey
 }
 
 var ErrMissingServiceName = fmt.Errorf("service name must be set via -name")
@@ -46,7 +61,7 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	fs.StringVar(&s.serviceName, "name", "", "Machine name to set on the tailnet")
 	fs.StringVar(&s.stateDir, "stateDir", "", "Directory where hoopsnake stores tsnet state")
 	fs.StringVar(&s.hostKeyFile, "hostKey", "", "Pathname to the SSH host key")
-	fs.StringVar(&s.authorizedKeyFile, "authorizedKeys", "", "Pathname to a file listing authorized client keys")
+	fs.Var(&s.authorizedKeyFiles, "authorizedKeys", "Pathnames to file listing authorized client keys (can be specified multiple times)")
 	fs.BoolVar(&s.tsnetVerbose, "tsnetVerbose", false, "Log tsnet messages verbosely")
 	fs.BoolVar(&s.deleteExisting, "deleteExisting", false, "Delete any down node with a conflicting name, if one exists")
 	fs.DurationVar(&s.maxNodeAge, "maxNodeAge", 30*time.Second, "Matching node must be offline at least this long if -deleteExisting is set")
