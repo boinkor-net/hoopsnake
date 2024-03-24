@@ -4,6 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io/fs"
+	"log"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -83,4 +86,35 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	}
 
 	return s, nil
+}
+
+// getCredential retrieves the named credential from the process
+// environment or, if unset there, from the equally-named systemd
+// credential.
+//
+// If the credential can't be retrieved from any of these sources,
+// getCredential returns a second value of false.
+//
+// If the credential exists on the environment, it is unset from the
+// process environment immediately, to prevent polluting downstream
+// programs' environments.
+func getCredential(name string) (string, bool) {
+	// from environment directly:
+	fromEnv, ok := os.LookupEnv(name)
+	if ok {
+		os.Unsetenv(name)
+		return fromEnv, true
+	}
+	// systemd credentials:
+	credentialDir, ok := os.LookupEnv("CREDENTIALS_DIRECTORY")
+	if !ok {
+		return "", false
+	}
+	dir := os.DirFS(credentialDir)
+	data, err := fs.ReadFile(dir, name)
+	if err != nil {
+		log.Printf("could not read credential %q/%q: %v", credentialDir, name, err)
+		return "", false
+	}
+	return strings.TrimSpace(string(data)), true
 }

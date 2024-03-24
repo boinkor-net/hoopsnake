@@ -10,23 +10,62 @@ import (
 
 	"golang.org/x/oauth2/clientcredentials"
 	"tailscale.com/client/tailscale"
+	"tailscale.com/ipn/store/mem"
+	"tailscale.com/tsnet"
+	"tailscale.com/types/logger"
 )
 
 var ErrNoAPIKeys = fmt.Errorf("neither TS_API_KEY, nor TS_API_CLIENT_ID and TS_API_CLIENT_SECRET are set")
 
+func (s *TailnetSSH) tsnetServer(ctx context.Context) (*tsnet.Server, error) {
+	state, err := mem.New(nil, "")
+	if err != nil {
+		return nil, fmt.Errorf("allocating in-memory state: %w", err)
+	}
+	srv := &tsnet.Server{
+		Store:      state,
+		Ephemeral:  true,
+		Hostname:   s.serviceName,
+		Dir:        s.stateDir,
+		Logf:       logger.Discard,
+		ControlURL: os.Getenv("TS_BASE_URL"),
+	}
+	if s.tsnetVerbose {
+		srv.Logf = log.Printf
+	}
+
+	authKey, ok := getCredential("TS_AUTHKEY")
+	if !ok {
+		var tsClient *tailscale.Client
+		authKey, tsClient, err = s.mintAuthKey(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("could not mint auth key: %w", err)
+		}
+		if s.deleteExisting {
+			err = s.cleanupOldNodes(ctx, tsClient)
+			if err != nil {
+				return nil, fmt.Errorf("could not clean up old nodes: %w", err)
+			}
+		}
+	}
+	srv.AuthKey = authKey
+	return srv, nil
+}
+
 func (s *TailnetSSH) setupTSClient(ctx context.Context) (*tailscale.Client, error) {
 	tailscale.I_Acknowledge_This_API_Is_Unstable = true // needed in order to use API clients.
-	apiKey := os.Getenv("TS_API_KEY")
-	if apiKey != "" {
+	apiKey, ok := getCredential("TS_API_KEY")
+	if ok {
+		log.Printf("WARNING: Using TS_API_KEY, the most inconvenient and insecure way to authenticate to tailscale. Please use oauth clients instead.")
 		return tailscale.NewClient("-", tailscale.APIKey(apiKey)), nil
 	}
 
-	clientID := os.Getenv("TS_API_CLIENT_ID")
-	clientSecret := os.Getenv("TS_API_CLIENT_SECRET")
+	clientID, idOk := getCredential("TS_API_CLIENT_ID")
+	clientSecret, secOk := getCredential("TS_API_CLIENT_SECRET")
 	baseURL := cmp.Or(os.Getenv("TS_BASE_URL"), "https://api.tailscale.com")
 	tsClient := tailscale.NewClient("-", nil)
 	tsClient.BaseURL = baseURL
-	if clientID == "" || clientSecret == "" {
+	if !idOk || !secOk {
 		return nil, ErrNoAPIKeys
 	}
 	credentials := clientcredentials.Config{
@@ -35,6 +74,7 @@ func (s *TailnetSSH) setupTSClient(ctx context.Context) (*tailscale.Client, erro
 		TokenURL:     tsClient.BaseURL + "/api/v2/oauth/token",
 		Scopes:       []string{"device"},
 	}
+
 	tsClient.HTTPClient = credentials.Client(ctx)
 	return tsClient, nil
 }
@@ -55,7 +95,7 @@ func (s *TailnetSSH) mintAuthKey(ctx context.Context) (string, *tailscale.Client
 
 	authkey, _, err := tsClient.CreateKey(ctx, caps)
 	if err != nil {
-		return "", nil, fmt.Errorf("minting a tailscale pre-authenticated key: %w", err)
+		return "", nil, fmt.Errorf("minting a tailscale pre-authenticated key for tags %v: %w", s.tags, err)
 	}
 	return authkey, tsClient, nil
 }
