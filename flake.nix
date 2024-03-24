@@ -40,7 +40,6 @@
           ];
           packages = [
             pkgs.go_1_22
-            pkgs.gopls
             (pkgs.golangci-lint.override
               {buildGoModule = args: (pkgs.buildGo122Module args);})
           ];
