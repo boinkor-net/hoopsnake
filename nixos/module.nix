@@ -57,6 +57,11 @@
         tsnetVerbose = mkEnableOption "verbose logging from the tsnet package";
 
         cleanup = {
+          exitTimeoutSec = mkOption {
+            description = "Number of seconds to wait for hoopsnake to exit after boot continues. If set to null, do not wait.";
+            default = 5;
+            type = types.nullOr types.int;
+          };
           deleteExisting = mkOption {
             description = "Whether to delete existing nodes with the configured hoopsnake SSH server's name";
             default = false;
@@ -90,6 +95,23 @@
            -authorizedKeys=/etc/hoopsnake/ssh/authorized_keys \
            -hostKey=/etc/hoopsnake/ssh/host_key \
            ${lib.escapeShellArg cfg.ssh.shell} &
+        hoopsnakePid=$!
+      '';
+      boot.initrd.postMountCommands = ''
+        if [ -n "$hoopsnakePid" ]; then
+          kill "$hoopsnakePid"
+          ${
+          if cfg.tailscale.cleanup.exitTimeoutSec != null
+          then ''
+            timeToWait=${toString cfg.tailscale.cleanup.exitTimeoutSec}
+            while [ $timeToWait -gt 0 ] && ! kill -0 "$hoopsnakePid" 2>/dev/null ; do
+              timeToWait=$((timeToWait-1))
+              sleep 1
+            done
+          ''
+          else ""
+        }
+        fi
       '';
       boot.initrd.secrets = lib.mkMerge [
         {
