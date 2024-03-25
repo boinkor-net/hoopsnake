@@ -16,10 +16,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	gossh "golang.org/x/crypto/ssh"
-	"tailscale.com/client/tailscale"
-	"tailscale.com/ipn/store/mem"
-	"tailscale.com/tsnet"
-	"tailscale.com/types/logger"
 )
 
 var (
@@ -30,18 +26,20 @@ var (
 )
 
 func (s *TailnetSSH) setupAuthorizedKeys() error {
-	authorizedKeysBytes, err := os.ReadFile(s.authorizedKeyFile)
-	if err != nil {
-		log.Fatalf("Could not read authorized keys file %q: %v", s.authorizedKeyFile, err)
-	}
-	for len(authorizedKeysBytes) > 0 {
-		pubKey, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedKeysBytes)
+	for _, path := range s.authorizedKeyFiles {
+		authorizedKeysBytes, err := os.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("Could not parse authorized key: %w", err)
+			log.Fatalf("Could not read authorized keys file %q: %v", path, err)
 		}
+		for len(authorizedKeysBytes) > 0 {
+			pubKey, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedKeysBytes)
+			if err != nil {
+				return fmt.Errorf("Could not parse authorized key: %w", err)
+			}
 
-		s.authorizedPubKeys = append(s.authorizedPubKeys, pubKey)
-		authorizedKeysBytes = rest
+			s.authorizedPubKeys = append(s.authorizedPubKeys, pubKey)
+			authorizedKeysBytes = rest
+		}
 	}
 	if len(s.authorizedPubKeys) > 0 {
 		s.Server.PublicKeyHandler = s.validatePubkey
@@ -81,37 +79,10 @@ func (s *TailnetSSH) Run(ctx context.Context, quit <-chan os.Signal) error {
 	var err error
 	s.Server.Handler = s.handle
 
-	state, err := mem.New(nil, "")
+	srv, err := s.tsnetServer(ctx)
 	if err != nil {
-		return fmt.Errorf("allocating in-memory state: %w", err)
+		return fmt.Errorf("could not setup a tsnet server: %w", err)
 	}
-	srv := &tsnet.Server{
-		Store:      state,
-		Ephemeral:  true,
-		Hostname:   s.serviceName,
-		Dir:        s.stateDir,
-		Logf:       logger.Discard,
-		ControlURL: os.Getenv("TS_BASE_URL"),
-	}
-	if s.tsnetVerbose {
-		srv.Logf = log.Printf
-	}
-
-	authKey := os.Getenv("TS_AUTHKEY")
-	if authKey == "" {
-		var tsClient *tailscale.Client
-		authKey, tsClient, err = s.mintAuthKey(ctx)
-		if err != nil {
-			return fmt.Errorf("could not mint auth key: %w", err)
-		}
-		if s.deleteExisting {
-			err = s.cleanupOldNodes(ctx, tsClient)
-			if err != nil {
-				return fmt.Errorf("could not clean up old nodes: %w", err)
-			}
-		}
-	}
-	srv.AuthKey = authKey
 
 	_, err = srv.Up(ctx)
 	if err != nil {
