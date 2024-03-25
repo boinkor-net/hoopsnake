@@ -63,9 +63,12 @@ To use oauth keypairs,
 2. Generate one on [the oauth clients
    page](https://login.tailscale.com/admin/settings/oauth) and bind it
    to that tag.
-2. Set the env variable `TS_API_CLIENT_ID` to the client ID
-3. Set the env variable `TS_API_CLIENT_SECRET` to the client secret
-4. Run `headscale ...` and it should be a proper tailscale oauth client.
+2. Write the client ID to a file and pass its pathname as `-clientIdFile`
+3. Write the client secret to another file and pass its pathname as `-clientSecretFile`.
+4. (You can also set `TS_API_CLIENT_ID` and `TS_API_CLIENT_SECRET` env
+   variables if those are more convenient. But you can't mix and match
+   the environment variable / file strategy.)
+4. Run `hoopsnake ...` and it should be a proper tailscale oauth client.
 
 ### other considerations: Cleaning out old device entries
 

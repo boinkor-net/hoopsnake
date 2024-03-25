@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2/clientcredentials"
@@ -60,14 +61,30 @@ func (s *TailnetSSH) setupTSClient(ctx context.Context) (*tailscale.Client, erro
 		return tailscale.NewClient("-", tailscale.APIKey(apiKey)), nil
 	}
 
-	clientID, idOk := getCredential("TS_API_CLIENT_ID")
-	clientSecret, secOk := getCredential("TS_API_CLIENT_SECRET")
+	var clientID, clientSecret string
+	if s.clientIDFile != "" && s.clientSecretFile != "" {
+		cidB, err := os.ReadFile(s.clientIDFile)
+		if err != nil {
+			return nil, fmt.Errorf("could not read client ID %q: %w", s.clientIDFile, err)
+		}
+		csB, err := os.ReadFile(s.clientSecretFile)
+		if err != nil {
+			return nil, fmt.Errorf("could not read client secret %q: %w", s.clientIDFile, err)
+		}
+		clientID = strings.TrimSpace(string(cidB))
+		clientSecret = strings.TrimSpace(string(csB))
+	} else {
+		var idOk, secOk bool
+		clientID, idOk = getCredential("TS_API_CLIENT_ID")
+		clientSecret, secOk = getCredential("TS_API_CLIENT_SECRET")
+		if !idOk || !secOk {
+			return nil, ErrNoAPIKeys
+		}
+	}
+
 	baseURL := cmp.Or(os.Getenv("TS_BASE_URL"), "https://api.tailscale.com")
 	tsClient := tailscale.NewClient("-", nil)
 	tsClient.BaseURL = baseURL
-	if !idOk || !secOk {
-		return nil, ErrNoAPIKeys
-	}
 	credentials := clientcredentials.Config{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,

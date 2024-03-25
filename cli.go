@@ -4,8 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io/fs"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -45,6 +43,8 @@ type TailnetSSH struct {
 	deleteExisting     bool
 	maxNodeAge         time.Duration
 	prometheusAddr     string
+	clientIDFile       string
+	clientSecretFile   string
 	tags               []string
 	command            []string
 	authorizedPubKeys  []gossh.PublicKey
@@ -53,6 +53,7 @@ type TailnetSSH struct {
 var ErrMissingServiceName = fmt.Errorf("service name must be set via -name")
 var ErrMissingACLTag = fmt.Errorf("service must have at least one ACL tag")
 var ErrMissingCommand = fmt.Errorf("ssh connections must run a command - pass that as the remaining cli arguments")
+var ErrMissingOauthCredential = fmt.Errorf("either none or both of -clientIdFile and -clientSecretFile must be passed")
 
 // / TailnetSSHFromArgs parses CLI arguments and constructs a validated TailnetSSH structure.
 func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
@@ -66,6 +67,8 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	fs.BoolVar(&s.deleteExisting, "deleteExisting", false, "Delete any down node with a conflicting name, if one exists")
 	fs.DurationVar(&s.maxNodeAge, "maxNodeAge", 30*time.Second, "Matching node must be offline at least this long if -deleteExisting is set")
 	fs.StringVar(&s.prometheusAddr, "prometheusAddr", ":9021", "Address on the tailnet node where prometheus requests get answered")
+	fs.StringVar(&s.clientIDFile, "clientIdFile", "", "File containing the tailscale OAUTH2 client ID")
+	fs.StringVar(&s.clientSecretFile, "clientSecretFile", "", "File containing the tailscale OAUTH2 client secret")
 
 	var tags string
 	fs.StringVar(&tags, "tags", "", "Tailnet ACL tags assigned to the node, comma-separated")
@@ -94,6 +97,9 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	if len(s.tags) == 0 {
 		return nil, ErrMissingACLTag
 	}
+	if (s.clientIDFile != "" && s.clientSecretFile == "") || (s.clientIDFile == "" && s.clientSecretFile != "") {
+		return nil, ErrMissingOauthCredential
+	}
 
 	s.command = root.FlagSet.Args()
 	if len(s.command) == 0 {
@@ -104,8 +110,7 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 }
 
 // getCredential retrieves the named credential from the process
-// environment or, if unset there, from the equally-named systemd
-// credential.
+// environment.
 //
 // If the credential can't be retrieved from any of these sources,
 // getCredential returns a second value of false.
@@ -120,16 +125,5 @@ func getCredential(name string) (string, bool) {
 		os.Unsetenv(name)
 		return fromEnv, true
 	}
-	// systemd credentials:
-	credentialDir, ok := os.LookupEnv("CREDENTIALS_DIRECTORY")
-	if !ok {
-		return "", false
-	}
-	dir := os.DirFS(credentialDir)
-	data, err := fs.ReadFile(dir, name)
-	if err != nil {
-		log.Printf("could not read credential %q/%q: %v", credentialDir, name, err)
-		return "", false
-	}
-	return strings.TrimSpace(string(data)), true
+	return "", false
 }
