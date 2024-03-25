@@ -84,7 +84,8 @@
         };
         environmentFile = mkOption {
           description = "Environment file setting TS_AUTHKEY, TS_API_KEY or TS_API_CLIENT_ID & TS_API_CLIENT_SECRET. These are secrets, so shouldn't live in the nix store. Only used in scripted stage1; If you use systemd in initrd, see the systemd-credentials section.";
-          type = types.path;
+          type = types.nullOr types.path;
+          default = null;
         };
         tsnetVerbose = mkEnableOption "verbose logging from the tsnet package";
 
@@ -151,8 +152,8 @@
           {
             "/etc/hoopsnake/ssh/host_key" = cfg.ssh.privateHostKey;
             "/etc/hoopsnake/ssh/authorized_keys" = cfg.ssh.authorizedKeysFile;
-            "/etc/hoopsnake/tailscale/environment" = cfg.tailscale.environmentFile;
           }
+          (lib.mkIf (cfg.tailscale.environmentFile != null) {"/etc/hoopsnake/tailscale/environment" = cfg.tailscale.environmentFile;})
           (lib.mkIf cfg.includeSSLBundle {
             "/etc/ssl/ca-bundle.crt" = config.environment.etc."ssl/certs/ca-bundle.crt".source;
             "/etc/ssl/ca-certificates.crt" = config.environment.etc."ssl/certs/ca-certificates.crt".source;
@@ -183,6 +184,7 @@
         boot.initrd.systemd.storePaths = [cfg.package];
         boot.initrd.systemd.services.hoopsnake = {
           wantedBy = ["initrd.target"];
+          partOf = ["initrd.target"];
           script = ''
             set -eu -x
 
@@ -199,7 +201,9 @@
           '';
           requires = ["network.target"];
           after = ["network.target"];
+          environment.HOME = "/tmp";
           serviceConfig = {
+            EnvironmentFile = lib.mkIf (cfg.tailscale.environmentFile != null) "/etc/hoopsnake/tailscale/environment";
             LoadCredential =
               lib.concatMap (
                 credName:
@@ -239,6 +243,7 @@
           {
             "/etc/hoopsnake/ssh/authorized_keys" = cfg.ssh.authorizedKeysFile;
           }
+          (lib.mkIf (cfg.tailscale.environmentFile != null) {"/etc/hoopsnake/tailscale/environment" = cfg.tailscale.environmentFile;})
           (lib.mkIf cfg.includeSSLBundle {
             "/etc/ssl/ca-bundle.crt" = config.environment.etc."ssl/certs/ca-bundle.crt".source;
             "/etc/ssl/ca-certificates.crt" = config.environment.etc."ssl/certs/ca-certificates.crt".source;

@@ -231,9 +231,13 @@
                     # TODO
                     privateHostKey.file = "${hostkey}/hostkey";
                     privateHostKey.encrypted = false;
-                    clientId.text = "hi";
+
+                    # This is a bit janky: The module expects to pass
+                    # a client ID & secret, but we don't have one
+                    # (headscale doesn't support it):
+                    clientId.text = "disabled";
                     clientId.encrypted = false;
-                    clientSecret.text = "hello";
+                    clientSecret.text = "disabled";
                     clientSecret.encrypted = false;
                   };
                   tailscale = {
