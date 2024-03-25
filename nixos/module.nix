@@ -183,8 +183,12 @@
       in {
         boot.initrd.systemd.storePaths = [cfg.package];
         boot.initrd.systemd.services.hoopsnake = {
+          description = "Hoopsnake initrd ssh server";
           wantedBy = ["initrd.target"];
-          partOf = ["initrd.target"];
+          after = ["network.target" "initrd-nixos-copy-secrets.service"];
+          before = ["shutdown.target" "initrd-switch-root.target"];
+          conflicts = ["shutdown.target" "initrd-switch-root.target"];
+
           script = ''
             set -eu -x
 
@@ -199,10 +203,12 @@
               -clientSecretFile=''${CREDENTIALS_DIRECTORY}/clientSecret \
               ${lib.escapeShellArg cfg.ssh.shell}
           '';
-          requires = ["network.target"];
-          after = ["network.target"];
+
           environment.HOME = "/tmp";
           serviceConfig = {
+            Type = "simple";
+            KillMode = "process";
+            Restart = "on-failure";
             EnvironmentFile = lib.mkIf (cfg.tailscale.environmentFile != null) "/etc/hoopsnake/tailscale/environment";
             LoadCredential =
               lib.concatMap (
