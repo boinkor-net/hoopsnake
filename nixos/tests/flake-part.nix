@@ -222,6 +222,7 @@
               boot.initrd.systemd = {
                 enable = true;
                 initrdBin = [fakeShell];
+                extraConfig = "LogLevel=debug";
               };
               boot.initrd.network.hoopsnake = {
                 enable = true;
