@@ -51,6 +51,8 @@
     bootloader = {config, ...}: {
       virtualisation.useBootLoader = true;
       virtualisation.useEFIBoot = true;
+      virtualisation.cores = 4;
+      virtualisation.memorySize = 1024;
       boot.loader.systemd-boot.enable = true;
       boot.loader.efi.canTouchEfiVariables = true;
       environment.systemPackages = [pkgs.efibootmgr];
