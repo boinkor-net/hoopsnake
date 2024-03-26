@@ -151,7 +151,6 @@
               ...
             }: {
               imports = [bootloader self.nixosModules.default];
-              services.tailscale.enable = true;
               boot.initrd.preLVMCommands = ''
                 while ! [ -f /tmp/fnord ] ; do
                   sleep 1
@@ -218,36 +217,33 @@
             in {
               imports = [bootloader self.nixosModules.default];
               testing.initrdBackdoor = true;
-              services.tailscale.enable = true;
               boot.initrd.systemd = {
                 enable = true;
                 initrdBin = [fakeShell];
               };
-              boot.initrd.network = {
-                hoopsnake = {
-                  enable = true;
-                  ssh = {
-                    authorizedKeysFile = "${clientKey}/client.pub";
-                    shell = "/bin/success";
-                  };
-                  systemd-credentials = {
-                    privateHostKey.file = "${hostkey}/hostkey";
-                    privateHostKey.encrypted = false;
+              boot.initrd.network.hoopsnake = {
+                enable = true;
+                ssh = {
+                  authorizedKeysFile = "${clientKey}/client.pub";
+                  shell = "/bin/success";
+                };
+                systemd-credentials = {
+                  privateHostKey.file = "${hostkey}/hostkey";
+                  privateHostKey.encrypted = false;
 
-                    # This is a bit janky: The module expects to pass
-                    # a client ID & secret, but we don't have one
-                    # (headscale doesn't support it):
-                    clientId.text = "disabled";
-                    clientId.encrypted = false;
-                    clientSecret.text = "disabled";
-                    clientSecret.encrypted = false;
-                  };
-                  tailscale = {
-                    name = "alice-boot";
-                    tags = ["tag:hoopsnake"];
-                    environmentFile = envFiles.authKey;
-                    tsnetVerbose = true;
-                  };
+                  # This is a bit janky: The module expects to pass
+                  # a client ID & secret, but we don't have one
+                  # (headscale doesn't support it):
+                  clientId.text = "disabled";
+                  clientId.encrypted = false;
+                  clientSecret.text = "disabled";
+                  clientSecret.encrypted = false;
+                };
+                tailscale = {
+                  name = "alice-boot";
+                  tags = ["tag:hoopsnake"];
+                  environmentFile = envFiles.authKey;
+                  tsnetVerbose = true;
                 };
               };
             };
