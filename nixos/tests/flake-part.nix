@@ -267,12 +267,15 @@
                 bob.execute(up_cmd)
                 headscale.succeed("import-pregenerated-keys")
 
-            alice.start()
-            bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
-            bob.succeed("ssh-to-alice", timeout=90)
-            alice.wait_until_succeeds("test -f /tmp/fnord")
-            alice.switch_root()
-            alice.wait_for_unit("multi-user.target", timeout=90)
+            with subtest("Unlock alice's boot progress"):
+                alice.start()
+                bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
+                bob.succeed("ssh-to-alice", timeout=90)
+                alice.wait_until_succeeds("test -f /tmp/fnord")
+                alice.switch_root()
+
+            with subtest("Finish booting alice"):
+                alice.wait_for_unit("multi-user.target", timeout=90)
           '';
         };
       };
