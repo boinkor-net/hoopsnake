@@ -131,7 +131,7 @@
                     cat ${hostkey}/hostkey >&2
                     echo "${hostkey}/known_hosts file contents:" >&2
                     cat ${hostkey}/known_hosts >&2
-                    echo | ssh -vvv -o UserKnownHostsFile=${hostkey}/known_hosts -i /etc/sshKey shell@alice-boot
+                    echo | ssh -v -o UserKnownHostsFile=${hostkey}/known_hosts -i /etc/sshKey shell@alice-boot
           '';
         })
       ];
@@ -210,25 +210,27 @@
               lib,
               config,
               ...
-            }: {
+            }: let
+              fakeShell = pkgs.writeShellApplication {
+                name = "success";
+                text = "touch /tmp/fnord";
+              };
+            in {
               imports = [bootloader self.nixosModules.default];
               testing.initrdBackdoor = true;
               services.tailscale.enable = true;
               boot.initrd.systemd = {
                 enable = true;
+                initrdBin = [fakeShell];
               };
               boot.initrd.network = {
                 hoopsnake = {
                   enable = true;
                   ssh = {
                     authorizedKeysFile = "${clientKey}/client.pub";
-                    shell = lib.getExe (pkgs.writeShellApplication {
-                      name = "success";
-                      text = "touch /tmp/fnord";
-                    });
+                    shell = "/bin/success";
                   };
                   systemd-credentials = {
-                    # TODO
                     privateHostKey.file = "${hostkey}/hostkey";
                     privateHostKey.encrypted = false;
 
