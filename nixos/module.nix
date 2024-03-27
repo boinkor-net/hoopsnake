@@ -181,7 +181,7 @@
           )
           credentials;
       in {
-        boot.initrd.systemd.storePaths = [cfg.package];
+        boot.initrd.systemd.storePaths = [cfg.package cfg.ssh.shell];
         boot.initrd.systemd.services.hoopsnake = {
           description = "Hoopsnake initrd ssh server";
           wantedBy = ["initrd.target"];
