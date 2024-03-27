@@ -16,11 +16,18 @@ func main() {
 		log.Fatalf("Invalid command line: %v", err)
 	}
 
+	ctx := context.Background()
+	ctx, terminate := context.WithCancel(ctx)
+
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		signal := <-c
+		log.Printf("Received signal %v, terminating...", signal)
+		terminate()
+	}()
 
-	ctx := context.Background()
-	err = cli.Run(ctx, c)
+	err = cli.Run(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

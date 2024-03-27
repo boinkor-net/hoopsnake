@@ -75,7 +75,7 @@ func (s *TailnetSSH) setupHostKey() error {
 //
 // If Run returns an error, that means it can no longer listen - these
 // errors are fatal.
-func (s *TailnetSSH) Run(ctx context.Context, quit <-chan os.Signal) error {
+func (s *TailnetSSH) Run(ctx context.Context) error {
 	var err error
 	s.Server.Handler = s.handle
 
@@ -95,21 +95,18 @@ func (s *TailnetSSH) Run(ctx context.Context, quit <-chan os.Signal) error {
 		return fmt.Errorf("could not listen on tailnet: %w", err)
 	}
 
-	terminated := false
 	go func() {
-		signal := <-quit
-		terminated = true
-		log.Printf("Received signal %v, terminating...", signal)
+		<-ctx.Done()
 		srv.Close()
 	}()
 
-	err = s.setupPrometheus(srv)
+	err = s.setupPrometheus(ctx, srv)
 	if err != nil {
 		log.Printf("Setting up prometheus failed, but continuing anyway: %v", err)
 	}
 	log.Printf("starting ssh server on port :22...")
 	err = s.Server.Serve(listener)
-	if err != nil && !terminated {
+	if err != nil && ctx.Err() == nil {
 		return fmt.Errorf("ssh server failed serving: %w", err)
 	}
 	return nil

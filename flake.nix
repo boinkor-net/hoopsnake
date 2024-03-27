@@ -31,6 +31,7 @@
             vendorHash = builtins.readFile ./default.sri;
             subPackages = ["cmd/hoopsnake"];
             src = lib.sourceFilesBySuffices (lib.sources.cleanSource ./.) [".go" ".mod" ".sum"];
+            CGO_ENABLED = 0;
             meta.mainProgram = "hoopsnake";
           };
         };
