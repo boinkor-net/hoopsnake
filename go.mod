@@ -11,7 +11,7 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	golang.org/x/crypto v0.21.0
 	golang.org/x/oauth2 v0.18.0
-	tailscale.com v1.62.0
+	tailscale.com v1.62.1
 )
 
 require (
