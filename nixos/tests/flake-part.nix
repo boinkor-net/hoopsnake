@@ -228,7 +228,7 @@
                 enable = true;
                 ssh = {
                   authorizedKeysFile = "${clientKey}/client.pub";
-                  shell = "/bin/success";
+                  commandLine = ["/bin/success"];
                 };
                 systemd-credentials = {
                   privateHostKey.file = "${hostkey}/hostkey";

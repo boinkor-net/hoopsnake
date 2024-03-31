@@ -35,9 +35,15 @@
           type = types.path;
         };
         shell = mkOption {
-          description = "The shell package to run";
+          description = "The shell package to run. Used to build boot.initrd.network.hoopsnake.ssh.commandLine.";
           default = "${pkgs.busybox}/bin/ash";
           type = types.oneOf [types.shellPackage types.path];
+        };
+
+        commandLine = mkOption {
+          description = "The concrete commandline to run.";
+          default = [config.boot.initrd.network.hoopsnake.ssh.shell];
+          type = types.listOf types.str;
         };
       };
 
@@ -129,7 +135,7 @@
              -maxNodeAge=${lib.escapeShellArg cfg.tailscale.cleanup.maxNodeAge} \
              -authorizedKeys=/etc/hoopsnake/ssh/authorized_keys \
              -hostKey=/etc/hoopsnake/ssh/host_key \
-             ${lib.escapeShellArg cfg.ssh.shell} &
+             ${lib.escapeShellArgs cfg.ssh.commandLine} &
           hoopsnakePid=$!
         '';
         boot.initrd.postMountCommands = ''
@@ -201,7 +207,7 @@
               -hostKey=''${CREDENTIALS_DIRECTORY}/privateHostKey \
               -clientIdFile=''${CREDENTIALS_DIRECTORY}/clientId \
               -clientSecretFile=''${CREDENTIALS_DIRECTORY}/clientSecret \
-              ${lib.escapeShellArg cfg.ssh.shell}
+              ${lib.escapeShellArg cfg.ssh.commandLine}
           '';
 
           environment.HOME = "/tmp";
