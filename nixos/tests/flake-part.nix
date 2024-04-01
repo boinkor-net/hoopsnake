@@ -51,17 +51,14 @@
     bootloader = {config, ...}: {
       virtualisation.useBootLoader = true;
       virtualisation.useEFIBoot = true;
+      virtualisation.cores = 4;
+      virtualisation.memorySize = 1024;
       boot.loader.systemd-boot.enable = true;
       boot.loader.efi.canTouchEfiVariables = true;
       environment.systemPackages = [pkgs.efibootmgr];
       boot.kernelParams = [
         "ip=${config.networking.primaryIPAddress}:::255.255.255.0::eth1:off"
       ];
-      boot.initrd.preLVMCommands = ''
-        while ! [ -f /tmp/fnord ] ; do
-            sleep 1
-        done
-      '';
       boot.initrd.network = {
         enable = true;
         udhcpc.enable = false;
@@ -117,46 +114,51 @@
         })
       ];
     };
-  in {
-    checks =
-      if ! pkgs.lib.hasSuffix "linux" system
-      then {}
-      else {
-        hoopsnake-starts = pkgs.testers.runNixOSTest {
-          name = "hoopsnake-starts";
-          nodes = {
-            inherit headscale;
-            bob = {
-              services.tailscale.enable = true;
-              security.pki.certificateFiles = ["${tls-cert}/cert.pem"];
-              networking.useDHCP = false;
-              environment.etc.sshKey = {
-                source = "${clientKey}/client";
-                mode = "0600";
-              };
-              environment.systemPackages = [
-                (pkgs.writeShellApplication {
-                  name = "ssh-to-alice";
-                  runtimeInputs = [pkgs.openssh];
-                  text = ''
-                    echo "${hostkey} fingerprint:" >&2
+    bob = {
+      services.tailscale.enable = true;
+      security.pki.certificateFiles = ["${tls-cert}/cert.pem"];
+      networking.useDHCP = false;
+      environment.etc.sshKey = {
+        source = "${clientKey}/client";
+        mode = "0600";
+      };
+      environment.systemPackages = [
+        (pkgs.writeShellApplication {
+          name = "ssh-to-alice";
+          runtimeInputs = [pkgs.openssh];
+          text = ''
+            echo "${hostkey} fingerprint:" >&2
                     ssh-keygen -l -f ${hostkey}/hostkey
                     echo "${hostkey} contents:" >&2
                     cat ${hostkey}/hostkey >&2
                     echo "${hostkey}/known_hosts file contents:" >&2
                     cat ${hostkey}/known_hosts >&2
-                    echo | ssh -vvv -o UserKnownHostsFile=${hostkey}/known_hosts -i /etc/sshKey shell@alice-boot
-                  '';
-                })
-              ];
-            };
+                    echo | ssh -v -o UserKnownHostsFile=${hostkey}/known_hosts -i /etc/sshKey shell@alice-boot
+          '';
+        })
+      ];
+    };
+  in {
+    checks =
+      if ! pkgs.lib.hasSuffix "linux" system
+      then {}
+      else {
+        hoopsnake-scripted = pkgs.testers.runNixOSTest {
+          name = "hoopsnake-scripted-initrd-stage1";
+          nodes = {
+            inherit headscale bob;
             alice = {
               lib,
               config,
               ...
             }: {
               imports = [bootloader self.nixosModules.default];
-              services.tailscale.enable = true;
+              boot.initrd.preLVMCommands = ''
+                while ! [ -f /tmp/fnord ] ; do
+                  sleep 1
+                done
+              '';
+
               boot.initrd.network = {
                 hoopsnake = {
                   enable = true;
@@ -180,24 +182,100 @@
           };
 
           testScript = ''
-            for node in [headscale, bob]:
-                node.start()
-            headscale.wait_for_unit("headscale")
-            headscale.wait_for_open_port(443)
+            with subtest("Test setup"):
+                for node in [headscale, bob]:
+                    node.start()
+                headscale.wait_for_unit("headscale")
+                headscale.wait_for_open_port(443)
 
-            # Create headscale user and preauth-key
-            headscale.succeed("headscale users create bob")
-            authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
+                # Create headscale user and preauth-key
+                headscale.succeed("headscale users create bob")
+                authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
 
-            # Connect peers
-            up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
-            bob.execute(up_cmd)
-            headscale.succeed("import-pregenerated-keys")
+                # Connect peers
+                up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
+                bob.execute(up_cmd)
+                headscale.succeed("import-pregenerated-keys")
 
             alice.start()
             bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
             bob.succeed("ssh-to-alice", timeout=90)
             alice.wait_for_unit("multi-user.target", timeout=90)
+          '';
+        };
+        hoopsnake-systemd = pkgs.testers.runNixOSTest {
+          name = "hoopsnake-systemd-initrd-stage1";
+          nodes = {
+            inherit headscale bob;
+            alice = {
+              lib,
+              config,
+              ...
+            }: let
+              fakeShell = pkgs.writeShellApplication {
+                name = "success";
+                text = "touch /tmp/fnord";
+              };
+            in {
+              imports = [bootloader self.nixosModules.default];
+              testing.initrdBackdoor = true;
+              boot.initrd.systemd = {
+                enable = true;
+                initrdBin = [fakeShell];
+              };
+              boot.initrd.network.hoopsnake = {
+                enable = true;
+                ssh = {
+                  authorizedKeysFile = "${clientKey}/client.pub";
+                  commandLine = ["/bin/success"];
+                };
+                systemd-credentials = {
+                  privateHostKey.file = "${hostkey}/hostkey";
+                  privateHostKey.encrypted = false;
+
+                  # This is a bit janky: The module expects to pass
+                  # a client ID & secret, but we don't have one
+                  # (headscale doesn't support it):
+                  clientId.text = "disabled";
+                  clientId.encrypted = false;
+                  clientSecret.text = "disabled";
+                  clientSecret.encrypted = false;
+                };
+                tailscale = {
+                  name = "alice-boot";
+                  tags = ["tag:hoopsnake"];
+                  environmentFile = envFiles.authKey;
+                  tsnetVerbose = true;
+                };
+              };
+            };
+          };
+
+          testScript = ''
+            with subtest("Test setup"):
+                for node in [headscale, bob]:
+                        node.start()
+                headscale.wait_for_unit("headscale")
+                headscale.wait_for_open_port(443)
+
+                # Create headscale user and preauth-key
+                headscale.succeed("headscale users create bob")
+                authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
+
+                # Connect peers
+                up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
+                bob.execute(up_cmd)
+                headscale.succeed("import-pregenerated-keys")
+
+            with subtest("Unlock alice's boot progress"):
+                alice.start()
+                bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
+                bob.succeed("ssh-to-alice", timeout=90)
+                alice.wait_until_succeeds("test -f /tmp/fnord")
+                alice.switch_root()
+
+            with subtest("Finish booting alice"):
+                alice.wait_for_unit("multi-user.target", timeout=90)
           '';
         };
       };

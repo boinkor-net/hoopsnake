@@ -1,6 +1,7 @@
 package hoopsnake
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,7 +14,7 @@ import (
 	"tailscale.com/tsnet"
 )
 
-func (s *TailnetSSH) setupPrometheus(srv *tsnet.Server) error {
+func (s *TailnetSSH) setupPrometheus(ctx context.Context, srv *tsnet.Server) error {
 	if s.prometheusAddr == "" {
 		return nil
 	}
@@ -28,8 +29,11 @@ func (s *TailnetSSH) setupPrometheus(srv *tsnet.Server) error {
 			Handler:           mux,
 			ReadHeaderTimeout: 1 * time.Second,
 		}
-		log.Printf("Failed to listen on prometheus address: %v", server.Serve(listener))
-		os.Exit(20)
+		if ctx.Err() == nil {
+			// Failed to listen but not asked to shut down:
+			log.Printf("Failed to listen on prometheus address: %v", server.Serve(listener))
+			os.Exit(20)
+		}
 	}()
 
 	v4, v6 := srv.TailscaleIPs()
