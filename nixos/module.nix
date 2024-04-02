@@ -191,7 +191,7 @@
         boot.initrd.systemd.services.hoopsnake = {
           description = "Hoopsnake initrd ssh server";
           wantedBy = ["initrd.target"];
-          after = ["network.target" "initrd-nixos-copy-secrets.service"];
+          after = ["network-online.target" "initrd-nixos-copy-secrets.service"];
           before = ["shutdown.target" "initrd-switch-root.target"];
           conflicts = ["shutdown.target" "initrd-switch-root.target"];
 
