@@ -1,0 +1,51 @@
+#!/bin/sh
+
+PREREQ=""
+
+prereqs() {
+    echo "$PREREQ"
+}
+
+case "$1" in
+    prereqs)
+        prereqs
+        exit 0
+    ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+hoopsnake_warn() {
+    echo "hoopsnake: WARNING:" "$@" >&2
+}
+
+copy_exec "$HOOPSNAKE_EXE" /sbin
+
+if [ "$INCLUDE_SSL_BUNDLE" = "y" ]; then
+    mkdir -p -- "$DESTDIR/etc/ssl/certs"
+    cp -R /etc/ssl/certs/. "$DESTDIR/etc/ssl/certs/"
+fi
+
+mkdir -p -- "$DESTDIR/etc/hoopsnake/ssh"
+
+if [ -e /etc/hoopsnake/initramfs/hoopsnake.conf ]; then
+    cp -pt "$DESTDIR/etc/hoopsnake/" "/etc/hoopsnake/initramfs/hoopsnake.conf"
+fi
+
+if [ -f "$PRIVATE_HOST_KEY" ]; then
+    cat "$PRIVATE_HOST_KEY" > "$DESTDIR/etc/hoopsnake/ssh/host_key"
+else
+    hoopsnake_warn "Missing host keys, SSH login to initramfs won't work!"
+fi
+
+if [ -e "$AUTHORIZED_KEYS_FILE" ]; then
+    cat "$AUTHORIZED_KEYS_FILE" > "$DESTDIR/etc/hoopsnake/ssh/authorized_keys"
+else
+    hoopsnake_warn "Missing authorized_keys file, SSH login to initramfs won't work!"
+fi
+
+if [ -e "$TAILSCALE_ENV_FILE" ]; then
+    cat "$TAILSCALE_ENV_FILE" > "$DESTDIR/etc/hoopsnake/tailscale_env"
+else
+    hoopsnake_warn "Missing Tailscale environment file, Tailscale will not be able to connect!"
+fi

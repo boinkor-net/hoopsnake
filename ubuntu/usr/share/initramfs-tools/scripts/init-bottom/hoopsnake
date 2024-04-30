@@ -1,0 +1,32 @@
+#!/bin/sh
+
+PREREQ=""
+
+prereqs() {
+	echo "$PREREQ"
+}
+
+case "$1" in
+	prereqs)
+		prereqs
+		exit 0
+	;;
+esac
+
+. /scripts/functions
+
+if [ -e /etc/hoopsnake/hoopsnake.conf ]; then
+    . /etc/hoopsnake/hoopsnake.conf
+fi
+
+PIDFILE="/run/hoopsnake.pid"
+hoopsnakePid="$(cat "$PIDFILE" 2>/dev/null)" || return 1
+
+if [ -n "$hoopsnakePid" ]; then
+    kill "$hoopsnakePid"
+    timeToWait=$EXIT_TIMEOUT_SEC
+    while [ $timeToWait -gt 0 ] && ! kill -0 "$hoopsnakePid" 2>/dev/null ; do
+        timeToWait=$((timeToWait-1))
+        sleep 1
+    done
+fi

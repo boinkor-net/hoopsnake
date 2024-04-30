@@ -1,0 +1,25 @@
+# Override variables from /etc/initramfs-tools/initramfs.conf, see
+# initramfs-tools(8)
+#
+
+# Set the umask value of the generated initramfs file to avoid
+# disclosing SSH host keys.
+UMASK=0077
+
+# Force use of busybox instead of klibc utilities
+BUSYBOX=y
+
+# The hoopsnake executable
+HOOPSNAKE_EXE=""
+
+# Include SSL bundle. Needed by Tailscale to connect to control plane.
+INCLUDE_SSL_BUNDLE="y"
+
+# Path to a PEM-encoded secret key that the hoopsnake SSH server will use to authenticate itself to clients.
+PRIVATE_HOST_KEY=""
+
+# Path to a file listing the authorized public keys that may authenticate to hoopsnake.
+AUTHORIZED_KEYS_FILE=""
+
+# Environment file setting TS_AUTHKEY, TS_API_KEY or TS_API_CLIENT_ID & TS_API_CLIENT_SECRET.
+TAILSCALE_ENV_FILE=""
