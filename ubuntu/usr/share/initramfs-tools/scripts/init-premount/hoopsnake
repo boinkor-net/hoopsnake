@@ -27,10 +27,6 @@ run_hoopsnake() {
     . /etc/hoopsnake/tailscale_env
     export TS_AUTHKEY TS_API_KEY TS_API_CLIENT_ID TS_API_CLIENT_SECRET TS_BASE_URL
 
-    # using exec and keeping hoopsnake in the foreground enables the
-    # init-bottom script to kill the remaining ipconfig processes if
-    # someone unlocks the rootfs from the console while the network is
-    # being configured
     exec /sbin/hoopsnake -name "$TAILSCALE_SERVICE_NAME" \
         -tsnetVerbose="$TSNET_VERBOSE" \
         -tags="$TAILSCALE_TAGS" \
@@ -46,11 +42,6 @@ if [ -e /etc/hoopsnake/hoopsnake.conf ]; then
 fi
 . /scripts/functions
 
-# On NFS mounts, wait until the network is configured.  On local mounts,
-# configure the network in the background (in run_hoopsnake()) so someone
-# with console access can enter the passphrase immediately.  (With the
-# default ip=dhcp, configure_networking hangs for 5mins or so when the
-# network is unavailable, for instance.)
 [ "$BOOT" != nfs ] || configure_networking
 
 run_hoopsnake &
