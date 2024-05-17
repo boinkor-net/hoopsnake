@@ -1,0 +1,25 @@
+#!/bin/sh
+
+umask 077
+
+mkdir -p /etc/hoopsnake/initramfs
+cp etc/hoopsnake/initramfs/hoopsnake.conf /etc/hoopsnake/initramfs/
+
+cp usr/share/initramfs-tools/conf-hooks.d/hoopsnake /usr/share/initramfs-tools/conf-hooks.d/
+cp usr/share/initramfs-tools/hooks/hoopsnake /usr/share/initramfs-tools/hooks/
+cp usr/share/initramfs-tools/scripts/init-bottom/hoopsnake /usr/share/initramfs-tools/scripts/init-bottom/
+cp usr/share/initramfs-tools/scripts/init-premount/hoopsnake /usr/share/initramfs-tools/scripts/init-premount/
+
+mkdir -p $HOME/.config/hoopsnake
+cat >$HOME/.config/hoopsnake/hoopsnake_ts_env <<EOL
+TS_API_CLIENT_ID=""
+TS_API_CLIENT_SECRET=""
+EOL
+
+ssh-keygen -N "" -t ed25519 -f $HOME/.config/hoopsnake/hostkey
+
+
+
+sed -i 's#HOOPSNAKE_EXE=""#HOOPSNAKE_EXE="/sbin/hoopsnake"#' /usr/share/initramfs-tools/conf-hooks.d/hoopsnake
+sed -i "s#TAILSCALE_ENV_FILE=\"\"#TAILSCALE_ENV_FILE=\"$HOME/.config/hoopsnake/hoopsnake_ts_env\"#" /usr/share/initramfs-tools/conf-hooks.d/hoopsnake
+sed -i "s#PRIVATE_HOST_KEY=\"\"#PRIVATE_HOST_KEY=\"$HOME/.config/hoopsnake/hostkey\"#" /usr/share/initramfs-tools/conf-hooks.d/hoopsnake

@@ -1,0 +1,47 @@
+#!/bin/sh
+
+PREREQ=""
+
+prereqs() {
+	echo "$PREREQ"
+}
+
+case "$1" in
+	prereqs)
+		prereqs
+		exit 0
+	;;
+esac
+
+. /scripts/functions
+
+IFDOWN=*
+
+if [ -e /etc/hoopsnake/hoopsnake.conf ]; then
+    . /etc/hoopsnake/hoopsnake.conf
+fi
+
+PIDFILE="/run/hoopsnake.pid"
+hoopsnakePid="$(cat "$PIDFILE" 2>/dev/null)" || return 1
+
+if [ -n "$hoopsnakePid" ]; then
+    kill "$hoopsnakePid"
+    timeToWait=$EXIT_TIMEOUT_SEC
+    while [ $timeToWait -gt 0 ] && ! kill -0 "$hoopsnakePid" 2>/dev/null ; do
+        timeToWait=$((timeToWait-1))
+        sleep 1
+    done
+fi
+
+
+if [ "$BOOT" != nfs ] && [ "$IFDOWN" != none ]; then
+    for IFACE in /sys/class/net/$IFDOWN; do
+        [ -e "$IFACE" ] || continue
+        IFACE="${IFACE#/sys/class/net/}"
+        log_begin_msg "Bringing down $IFACE"
+        ip link    set   dev "$IFACE" down
+        ip address flush dev "$IFACE"
+        ip route   flush dev "$IFACE"
+        log_end_msg
+    done
+fi

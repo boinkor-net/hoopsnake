@@ -1,0 +1,48 @@
+#!/bin/sh
+
+PREREQ="udev"
+
+prereqs() {
+    echo "$PREREQ"
+}
+
+case "$1" in
+    prereqs)
+        prereqs
+        exit 0
+    ;;
+esac
+
+[ -x /sbin/hoopsnake ] || exit 0
+
+
+run_hoopsnake() {
+
+    # always run configure_networking() before hoopsnake; on NFS
+    # mounts this has been done already
+    [ "$BOOT" = nfs ] || configure_networking
+
+    log_begin_msg "Starting hoopsnake"
+
+    . /etc/hoopsnake/tailscale_env
+    export TS_AUTHKEY TS_API_KEY TS_API_CLIENT_ID TS_API_CLIENT_SECRET TS_BASE_URL
+
+    exec /sbin/hoopsnake -name "$TAILSCALE_SERVICE_NAME" \
+        -tsnetVerbose="$TSNET_VERBOSE" \
+        -tags="$TAILSCALE_TAGS" \
+        -deleteExisting="$TAILSCALE_DELETE_EXISTING"  \
+        -maxNodeAge="$TAILSCALE_MAX_NODE_AGE" \
+        -authorizedKeys=/etc/hoopsnake/ssh/authorized_keys \
+        -hostKey=/etc/hoopsnake/ssh/host_key \
+        "$HOOPSNAKE_CMD"
+}
+
+if [ -e /etc/hoopsnake/hoopsnake.conf ]; then
+    . /etc/hoopsnake/hoopsnake.conf
+fi
+. /scripts/functions
+
+[ "$BOOT" != nfs ] || configure_networking
+
+run_hoopsnake &
+echo $! >/run/hoopsnake.pid
