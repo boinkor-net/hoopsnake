@@ -5,9 +5,7 @@
       self,
       withSystem,
       ...
-    }: let
-      inherit (flake-parts-lib) importApply;
-    in {
+    }: {
       imports = [
         inputs.devshell.flakeModule
         inputs.generate-go-sri.flakeModules.default
@@ -25,7 +23,7 @@
 
         packages = {
           default = config.packages.hoopsnake;
-          hoopsnake = pkgs.buildGo122Module rec {
+          hoopsnake = pkgs.buildGo123Module rec {
             pname = "hoopsnake";
             version = "0.0.0";
             vendorHash = builtins.readFile ./default.sri;
@@ -40,9 +38,8 @@
           commands = [
           ];
           packages = [
-            pkgs.go_1_22
-            (pkgs.golangci-lint.override
-              {buildGoModule = args: (pkgs.buildGo122Module args);})
+            pkgs.go_1_23
+            pkgs.golangci-lint
           ];
         };
       };
