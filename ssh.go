@@ -15,6 +15,7 @@ import (
 	"github.com/gliderlabs/ssh"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/reiver/go-cast"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -112,9 +113,17 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 	return nil
 }
 
-func setWinsize(f *os.File, w, h int) {
+func setWinsize(f *os.File, width, height int) {
+	w, err := cast.Uint16(width)
+	if err != nil {
+		return
+	}
+	h, err := cast.Uint16(height)
+	if err != nil {
+		return
+	}
 	_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(syscall.TIOCSWINSZ),
-		uintptr(unsafe.Pointer(&struct{ h, w, x, y uint16 }{uint16(h), uint16(w), 0, 0})))
+		uintptr(unsafe.Pointer(&struct{ h, w, x, y uint16 }{h, w, 0, 0})))
 }
 
 func (s *TailnetSSH) handle(sess ssh.Session) {
