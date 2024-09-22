@@ -7,6 +7,7 @@ require (
 	github.com/gliderlabs/ssh v0.3.7
 	github.com/peterbourgon/ff/v3 v3.4.0
 	github.com/prometheus/client_golang v1.19.1
+	github.com/reiver/go-cast v0.0.0-20240904124821-be0103637c3f
 	golang.org/x/crypto v0.25.0
 	golang.org/x/oauth2 v0.21.0
 	tailscale.com v1.70.0
@@ -68,6 +69,7 @@ require (
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.48.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
+	github.com/reiver/go-erorr v0.0.0-20240801233437-8cbde6d1fa3f // indirect
 	github.com/safchain/ethtool v0.3.0 // indirect
 	github.com/tailscale/certstore v0.1.1-0.20231202035212-d3fa0460f47e // indirect
 	github.com/tailscale/go-winio v0.0.0-20231025203758-c4f33415bf55 // indirect

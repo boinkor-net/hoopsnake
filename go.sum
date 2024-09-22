@@ -154,6 +154,10 @@ github.com/prometheus/common v0.48.0 h1:QO8U2CdOzSn1BBsmXJXduaaW+dY/5QLjfB8svtSz
 github.com/prometheus/common v0.48.0/go.mod h1:0/KsvlIEfPQCQ5I2iNSAWKPZziNCvRs5EC6ILDTlAPc=
 github.com/prometheus/procfs v0.12.0 h1:jluTpSng7V9hY0O2R9DzzJHYb2xULk9VTR1V1R/k6Bo=
 github.com/prometheus/procfs v0.12.0/go.mod h1:pcuDEFsWDnvcgNzo4EEweacyhjeA9Zk3cnaOZAZEfOo=
+github.com/reiver/go-cast v0.0.0-20240904124821-be0103637c3f h1:+xhln673LL2XG1qhsUG1e+HHdXm/lTWihmr5G815dMc=
+github.com/reiver/go-cast v0.0.0-20240904124821-be0103637c3f/go.mod h1:baMIic1VWx4m5MRviwSyHFx1Z6POGMRrnVgsMvsLlAA=
+github.com/reiver/go-erorr v0.0.0-20240801233437-8cbde6d1fa3f h1:D1QSxKHm8U73XhjsW3SFLkT0zT5pKJi+1KGboMhY1Rk=
+github.com/reiver/go-erorr v0.0.0-20240801233437-8cbde6d1fa3f/go.mod h1:F0HbBf+Ak2ZlE8YkDW4Y+KxaUmT0KaaIJK6CXY3cJxE=
 github.com/rogpeppe/go-internal v1.11.0 h1:cWPaGQEPrBb5/AsnsZesgZZ9yb1OQ+GOISoDNXVBh4M=
 github.com/rogpeppe/go-internal v1.11.0/go.mod h1:ddIwULY96R17DhadqLgMfk9H9tvdUzkipdSkR5nkCZA=
 github.com/safchain/ethtool v0.3.0 h1:gimQJpsI6sc1yIqP/y8GYgiXn/NjgvpM0RNoWLVVmP0=
