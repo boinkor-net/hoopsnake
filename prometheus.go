@@ -29,9 +29,10 @@ func (s *TailnetSSH) setupPrometheus(ctx context.Context, srv *tsnet.Server) err
 			Handler:           mux,
 			ReadHeaderTimeout: 1 * time.Second,
 		}
-		if ctx.Err() == nil {
+		err := server.Serve(listener)
+		if err != nil && ctx.Err() == nil {
 			// Failed to listen but not asked to shut down:
-			log.Printf("Failed to listen on prometheus address: %v", server.Serve(listener))
+			log.Printf("Failed to listen on prometheus address: %v", err)
 			os.Exit(20)
 		}
 	}()
