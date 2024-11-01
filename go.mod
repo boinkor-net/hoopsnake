@@ -3,14 +3,14 @@ module github.com/boinkor-net/hoopsnake
 go 1.23.1
 
 require (
-	github.com/creack/pty v1.1.23
+	github.com/creack/pty v1.1.24
 	github.com/gliderlabs/ssh v0.3.7
 	github.com/peterbourgon/ff/v3 v3.4.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/reiver/go-cast v0.0.0-20240904124821-be0103637c3f
 	golang.org/x/crypto v0.28.0
 	golang.org/x/oauth2 v0.23.0
-	tailscale.com v1.76.1
+	tailscale.com v1.76.3
 )
 
 require (
