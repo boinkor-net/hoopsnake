@@ -48,6 +48,10 @@
       mkdir $out
       ssh-keygen -N "" -t ed25519 -f $out/client
     '';
+    badClientKey = pkgs.runCommand "badClientKey" {buildInputs = [pkgs.openssh];} ''
+      mkdir $out
+      ssh-keygen -N "" -t ed25519 -f $out/client
+    '';
     bootloader = {config, ...}: {
       virtualisation.useBootLoader = true;
       virtualisation.useEFIBoot = true;
@@ -79,6 +83,7 @@
           settings = {
             server_url = "https://headscale";
             ip_prefixes = ["100.64.0.0/10"];
+            dns.base_domain = "hoopsnake-testing.example.com";
             derp.server = {
               enabled = true;
               region_id = 999;
@@ -128,16 +133,49 @@
           runtimeInputs = [pkgs.openssh];
           text = ''
             echo "${hostkey} fingerprint:" >&2
-                    ssh-keygen -l -f ${hostkey}/hostkey
-                    echo "${hostkey} contents:" >&2
-                    cat ${hostkey}/hostkey >&2
-                    echo "${hostkey}/known_hosts file contents:" >&2
-                    cat ${hostkey}/known_hosts >&2
-                    echo | ssh -v -o UserKnownHostsFile=${hostkey}/known_hosts -i /etc/sshKey shell@alice-boot
+            ssh-keygen -l -f ${hostkey}/hostkey
+            echo "${hostkey} contents:" >&2
+            cat ${hostkey}/hostkey >&2
+            echo "${hostkey}/known_hosts file contents:" >&2
+            cat ${hostkey}/known_hosts >&2
+            echo | ssh -v -o UserKnownHostsFile=${hostkey}/known_hosts -i /etc/sshKey shell@alice-boot
           '';
         })
       ];
     };
+    mallory = pkgs.lib.mkMerge [
+      bob
+      {
+        environment.etc.badSshKey = {
+          source = "${badClientKey}/client";
+          mode = "0600";
+        };
+        environment.etc.spoofedPubkey = {
+          source = "${clientKey}/client.pub";
+          mode = "0600";
+        };
+        environment.systemPackages = let
+          poc = pkgs.buildGoModule {
+            pname = "CVE-2024-45337";
+            version = "0.0.1";
+            src = pkgs.fetchgit {
+              url = "https://codeberg.org/Gusted/CVE-2024-45337.git";
+              rev = "9d021bfa1898c53929c5a6ef70e03b80a1a2fd52";
+              hash = "sha256-B7Qpxs6+gpVwJULlYbCPcaVjAksA+XGBj52wV9sGsK8=";
+            };
+            vendorHash = null;
+            meta.mainProgram = "CVE-2024-45337";
+          };
+        in [
+          (pkgs.writeShellApplication {
+            name = "ssh-to-alice-but-evil";
+            text = ''
+              ${pkgs.lib.getExe poc} -i /etc/badSshKey -s "$(cat /etc/spoofedPubkey)" shell@alice-boot
+            '';
+          })
+        ];
+      }
+    ];
   in {
     checks =
       if ! pkgs.lib.hasSuffix "linux" system
@@ -276,6 +314,77 @@
 
             with subtest("Finish booting alice"):
                 alice.wait_for_unit("multi-user.target", timeout=90)
+          '';
+        };
+
+        hoopsnake-CVE-2024-45337 = pkgs.testers.runNixOSTest {
+          name = "hoopsnake-CVE-2024-45337";
+          nodes = {
+            inherit headscale mallory;
+            alice = {
+              lib,
+              config,
+              ...
+            }: let
+              fakeShell = pkgs.writeShellApplication {
+                name = "success";
+                text = "touch /tmp/fnord";
+              };
+            in {
+              imports = [bootloader self.nixosModules.default];
+              testing.initrdBackdoor = true;
+              boot.initrd.systemd = {
+                enable = true;
+                initrdBin = [fakeShell];
+              };
+              boot.initrd.network.hoopsnake = {
+                enable = true;
+                ssh = {
+                  authorizedKeysFile = "${clientKey}/client.pub";
+                  commandLine = ["/bin/success"];
+                };
+                systemd-credentials = {
+                  privateHostKey.file = "${hostkey}/hostkey";
+                  privateHostKey.encrypted = false;
+
+                  # This is a bit janky: The module expects to pass
+                  # a client ID & secret, but we don't have one
+                  # (headscale doesn't support it):
+                  clientId.text = "disabled";
+                  clientId.encrypted = false;
+                  clientSecret.text = "disabled";
+                  clientSecret.encrypted = false;
+                };
+                tailscale = {
+                  name = "alice-boot";
+                  tags = ["tag:hoopsnake"];
+                  environmentFile = envFiles.authKey;
+                  tsnetVerbose = true;
+                };
+              };
+            };
+          };
+
+          testScript = ''
+            with subtest("Test setup"):
+                for node in [headscale, mallory]:
+                        node.start()
+                headscale.wait_for_unit("headscale")
+                headscale.wait_for_open_port(443)
+
+                # Create headscale user and preauth-key
+                headscale.succeed("headscale users create mallory")
+                authkey = headscale.succeed("headscale preauthkeys -u mallory create --reusable")
+
+                # Connect peers
+                up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
+                mallory.execute(up_cmd)
+                headscale.succeed("import-pregenerated-keys")
+
+            with subtest("Can't authenticate with a spoofed public key"):
+                alice.start()
+                mallory.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
+                mallory.fail("ssh-to-alice-but-evil", timeout=90)
           '';
         };
       };
