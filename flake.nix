@@ -23,7 +23,7 @@
 
         packages = {
           default = config.packages.hoopsnake;
-          hoopsnake = pkgs.buildGo123Module rec {
+          hoopsnake = pkgs.buildGo123Module {
             pname = "hoopsnake";
             version = "0.0.0";
             vendorHash = builtins.readFile ./default.sri;
