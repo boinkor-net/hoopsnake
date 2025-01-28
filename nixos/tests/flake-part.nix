@@ -79,6 +79,7 @@
           settings = {
             server_url = "https://headscale";
             ip_prefixes = ["100.64.0.0/10"];
+            dns.magic_dns = false;
             derp.server = {
               enabled = true;
               region_id = 999;
@@ -127,13 +128,16 @@
           name = "ssh-to-alice";
           runtimeInputs = [pkgs.openssh];
           text = ''
+            alice_ip="$1"
             echo "${hostkey} fingerprint:" >&2
-                    ssh-keygen -l -f ${hostkey}/hostkey
-                    echo "${hostkey} contents:" >&2
-                    cat ${hostkey}/hostkey >&2
-                    echo "${hostkey}/known_hosts file contents:" >&2
-                    cat ${hostkey}/known_hosts >&2
-                    echo | ssh -v -o UserKnownHostsFile=${hostkey}/known_hosts -i /etc/sshKey shell@alice-boot
+            ssh-keygen -l -f ${hostkey}/hostkey
+            echo "${hostkey} contents:" >&2
+            cat ${hostkey}/hostkey >&2
+            echo "${hostkey}/known_hosts file contents:" >&2
+            cat ${hostkey}/known_hosts >&2
+
+            sed "s/^alice-boot/$alice_ip/" ${hostkey}/known_hosts | tee /tmp/resolved-known-hosts
+            echo | ssh -v -o UserKnownHostsFile=/tmp/resolved-known-hosts -i /etc/sshKey shell@"$alice_ip"
           '';
         })
       ];
@@ -182,10 +186,25 @@
           };
 
           testScript = ''
+            import time
+            import json
+
+            def wait_for_hoopsnake_registered(name):
+                "Poll until hoopsnake appears in the list of hosts, then return its IP."
+                while True:
+                    output = json.loads(headscale.succeed("headscale nodes list -o json-line"))
+                    print(output)
+                    basic_entry = [elt["ip_addresses"][0] for elt in output if elt["given_name"] == name]
+                    if len(basic_entry) == 1:
+                        return basic_entry[0]
+                    time.sleep(1)
+
+
             with subtest("Test setup"):
                 for node in [headscale, bob]:
                     node.start()
                 headscale.wait_for_unit("headscale")
+                headscale.wait_for_open_port(${toString headscalePort})
                 headscale.wait_for_open_port(443)
 
                 # Create headscale user and preauth-key
@@ -199,7 +218,8 @@
 
             alice.start()
             bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
-            bob.succeed("ssh-to-alice", timeout=90)
+            alice_ip = wait_for_hoopsnake_registered("alice-boot")
+            bob.succeed(f"ssh-to-alice {alice_ip}", timeout=90)
             alice.wait_for_unit("multi-user.target", timeout=90)
           '';
         };
@@ -252,10 +272,24 @@
           };
 
           testScript = ''
+            import time
+            import json
+
+            def wait_for_hoopsnake_registered(name):
+                "Poll until hoopsnake appears in the list of hosts, then return its IP."
+                while True:
+                    output = json.loads(headscale.succeed("headscale nodes list -o json-line"))
+                    print(output)
+                    basic_entry = [elt["ip_addresses"][0] for elt in output if elt["given_name"] == name]
+                    if len(basic_entry) == 1:
+                        return basic_entry[0]
+                    time.sleep(1)
+
             with subtest("Test setup"):
                 for node in [headscale, bob]:
                         node.start()
                 headscale.wait_for_unit("headscale")
+                headscale.wait_for_open_port(${toString headscalePort})
                 headscale.wait_for_open_port(443)
 
                 # Create headscale user and preauth-key
@@ -270,7 +304,8 @@
             with subtest("Unlock alice's boot progress"):
                 alice.start()
                 bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
-                bob.succeed("ssh-to-alice", timeout=90)
+                alice_ip = wait_for_hoopsnake_registered("alice-boot")
+                bob.succeed(f"ssh-to-alice {alice_ip}", timeout=90)
                 alice.wait_until_succeeds("test -f /tmp/fnord")
                 alice.switch_root()
 
