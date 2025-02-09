@@ -23,13 +23,13 @@
 
         packages = {
           default = config.packages.hoopsnake;
-          hoopsnake = pkgs.buildGo123Module rec {
+          hoopsnake = pkgs.buildGo123Module {
             pname = "hoopsnake";
             version = "0.0.0";
             vendorHash = builtins.readFile ./default.sri;
             subPackages = ["cmd/hoopsnake"];
             src = lib.sourceFilesBySuffices (lib.sources.cleanSource ./.) [".go" ".mod" ".sum"];
-            CGO_ENABLED = 0;
+            env.CGO_ENABLED = 0;
             meta.mainProgram = "hoopsnake";
           };
         };
