@@ -16,9 +16,19 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Generate token
+        id: generate_token
+        uses: tibdex/github-app-token@v2
+        with:
+          app_id: ${{ vars.PR_FIXUP_APP_ID }}
+          private_key: ${{ secrets.PR_FIXUP_APP_PRIVATE_KEY }}
+          installation_id: ${{ vars.PR_FIXUP_INSTALLATION_ID }}
+          permissions: >-
+            {"contents": "write", "pull_requests": "write"}
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # otherwise, you will failed to push refs to dest repo
+          fetch-depth: 0
+          token: ${{steps.generate_token.outputs.token}}
       - uses: cachix/install-nix-action@v30
       - uses: DeterminateSystems/magic-nix-cache-action@v9
       - name: re-generate SRI
