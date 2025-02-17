@@ -17,28 +17,70 @@
     '';
 
     # OK, so this is pretty lol/lmao.  Since we need working API
-    # keys to build the machines, we have to use "known" API keys
+    # keys to build the machines that'll boot into headscale, we
+    # have to use "known" API keys
     # that the headscale server knows about; we also need those in
     # the environment file that alice's hoopsnake nixos config
-    # module uses; and so: we take a known set of API keys and a DB
-    # dump, adjust a few timings and import that into the running
-    # headscale server.
-    envFiles = {
-      apiKey = pkgs.writeText "apikey-envfile" ''
-        TS_API_KEY=OVehtREWXA._bTQCNek9SsZk5Jy9aIUpGWNWXo61rTh0QTg-_MUCv4
-        TS_BASE_URL=https://headscale
+    # module uses; and so: we run a mock headscale server at build
+    # time, set up the api keys and then take a DB dump.
+    headscaleAccess = let
+      config = {
+        server_url = "https://headscale";
+        listen_addr = "127.0.0.1:8080";
+        unix_socket = "@VARLIB@/headscale.sock";
+        noise.private_key_path = "@VARLIB@/noise-private.key";
+        prefixes.v4 = "100.64.0.0/10";
+        derp.server = {
+          enabled = true;
+          region_id = 999;
+          private_key_path = "@VARLIB@/derp-private.key";
+          stun_listen_addr = "127.0.0.1:3478";
+        };
+        database = {
+          type = "sqlite";
+          sqlite.path = "@VARLIB@/headscale.db";
+        };
+        dns.magic_dns = false;
+      };
+      configFile = pkgs.writeText "headscale-setup-config.yaml" (builtins.toJSON config);
+    in
+      pkgs.runCommand "setup-headscale" {
+        nativeBuildInputs = [pkgs.headscale pkgs.sqlite];
+      } ''
+        set -eux
+
+        mkdir -p $out
+        export VARLIB=$(pwd)/var-lib
+        mkdir -p $VARLIB
+
+        substitute ${configFile} ./config.yaml --subst-var VARLIB
+        headscale serve --config ./config.yaml &
+        server_pid="$!"
+        trap "kill $server_pid" EXIT
+        for try in $(seq 1 10); do
+            if [ -e $VARLIB/headscale.sock ]; then
+              break
+            fi
+            sleep 1
+        done
+
+        headscale users create --config ./config.yaml bob
+        api_key="$(headscale apikeys create --config ./config.yaml)"
+        auth_key="$(headscale preauthkeys create --config ./config.yaml -u bob)"
+        cat >$out/apikey-envfile <<EOF
+        TS_API_KEY=$api_key
+        TS_BASE_URL=${config.server_url}
+        EOF
+        cat >$out/authkey-envfile <<EOF
+        TS_AUTHKEY=$auth_key
+        TS_BASE_URL=${config.server_url}
+        EOF
+
+        trap - EXIT
+        kill $server_pid
+        wait
+        sqlite3 $VARLIB/headscale.db .dump | grep -E -e '^INSERT INTO (api_keys|users|pre_auth_keys)' |tee $out/database-dump.sql
       '';
-      authKey = pkgs.writeText "apikey-envfile" ''
-        TS_AUTHKEY=e01aa49edded75748e17903330e3f18c25496b47360ffdec
-        TS_BASE_URL=https://headscale
-      '';
-      # Unfortunately, headscale doesn't support oauth client id/secret yet.
-    };
-    dbDump = pkgs.writeText "generated_keys.sql" ''
-      .timeout 5000
-      INSERT INTO pre_auth_keys VALUES(90,'e01aa49edded75748e17903330e3f18c25496b47360ffdec',1,0,0,0,datetime(),datetime('now','+1 hour'));
-      INSERT INTO api_keys VALUES(90,'OVehtREWXA',X'24326124313024436f72666574456a30774973344c3745616e697234756e2e536c6746654e71527030694448596153594968355a65374f6742513061',datetime(),datetime('now','+1 hour'),NULL);
-    '';
     hostkey = pkgs.runCommand "hostkey" {buildInputs = [pkgs.openssh];} ''
       mkdir $out
       ssh-keygen -N "" -t ed25519 -f $out/hostkey
@@ -110,7 +152,7 @@
           name = "import-pregenerated-keys";
           runtimeInputs = [pkgs.sqlite];
           text = ''
-            sqlite3 /var/lib/headscale/db.sqlite <${dbDump}
+            sqlite3 /var/lib/headscale/db.sqlite <${headscaleAccess}/database-dump.sql
           '';
         })
       ];
@@ -177,7 +219,7 @@
                   tailscale = {
                     name = "alice-boot";
                     tags = ["tag:hoopsnake"];
-                    environmentFile = envFiles.authKey;
+                    environmentFile = "${headscaleAccess}/authkey-envfile";
                     tsnetVerbose = true;
                   };
                 };
@@ -207,14 +249,13 @@
                 headscale.wait_for_open_port(${toString headscalePort})
                 headscale.wait_for_open_port(443)
 
-                # Create headscale user and preauth-key
-                headscale.succeed("headscale users create bob")
+                # Import user & hoopsnake auth key
+                headscale.succeed("import-pregenerated-keys")
                 authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
 
                 # Connect peers
                 up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
                 bob.execute(up_cmd)
-                headscale.succeed("import-pregenerated-keys")
 
             alice.start()
             bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
@@ -264,7 +305,7 @@
                 tailscale = {
                   name = "alice-boot";
                   tags = ["tag:hoopsnake"];
-                  environmentFile = envFiles.authKey;
+                  environmentFile = "${headscaleAccess}/authkey-envfile";
                   tsnetVerbose = true;
                 };
               };
@@ -292,14 +333,15 @@
                 headscale.wait_for_open_port(${toString headscalePort})
                 headscale.wait_for_open_port(443)
 
-                # Create headscale user and preauth-key
-                headscale.succeed("headscale users create bob")
+                # Create user and hoopsnake preauth key:
+                headscale.succeed("import-pregenerated-keys")
+
+                # Create headscale preauth-key that we use for tailscale
                 authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
 
                 # Connect peers
                 up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
                 bob.execute(up_cmd)
-                headscale.succeed("import-pregenerated-keys")
 
             with subtest("Unlock alice's boot progress"):
                 alice.start()
