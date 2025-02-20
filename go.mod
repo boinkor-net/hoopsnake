@@ -6,7 +6,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/peterbourgon/ff/v3 v3.4.0
-	github.com/prometheus/client_golang v1.20.5
+	github.com/prometheus/client_golang v1.21.0
 	github.com/reiver/go-cast v0.0.0-20240904124821-be0103637c3f
 	golang.org/x/crypto v0.33.0
 	golang.org/x/oauth2 v0.26.0
@@ -68,7 +68,7 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/prometheus-community/pro-bing v0.4.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.55.0 // indirect
+	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/reiver/go-erorr v0.0.0-20240801233437-8cbde6d1fa3f // indirect
 	github.com/safchain/ethtool v0.3.0 // indirect
@@ -97,6 +97,6 @@ require (
 	golang.org/x/tools v0.29.0 // indirect
 	golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 // indirect
 	golang.zx2c4.com/wireguard/windows v0.5.3 // indirect
-	google.golang.org/protobuf v1.35.1 // indirect
+	google.golang.org/protobuf v1.36.1 // indirect
 	gvisor.dev/gvisor v0.0.0-20240722211153-64c016c92987 // indirect
 )
