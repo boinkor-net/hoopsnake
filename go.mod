@@ -6,11 +6,11 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/peterbourgon/ff/v3 v3.4.0
-	github.com/prometheus/client_golang v1.21.0
+	github.com/prometheus/client_golang v1.21.1
 	github.com/reiver/go-cast v0.0.0-20240904124821-be0103637c3f
 	golang.org/x/crypto v0.35.0
 	golang.org/x/oauth2 v0.27.0
-	tailscale.com v1.80.2
+	tailscale.com v1.80.3
 )
 
 require (
