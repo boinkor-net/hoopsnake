@@ -48,6 +48,7 @@ type TailnetSSH struct {
 	tags               []string
 	command            []string
 	authorizedPubKeys  []gossh.PublicKey
+	configTestOnly     bool
 }
 
 var ErrMissingServiceName = fmt.Errorf("service name must be set via -name")
@@ -69,6 +70,7 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	fs.StringVar(&s.prometheusAddr, "prometheusAddr", ":9021", "Address on the tailnet node where prometheus requests get answered")
 	fs.StringVar(&s.clientIDFile, "clientIdFile", "", "File containing the tailscale OAUTH2 client ID")
 	fs.StringVar(&s.clientSecretFile, "clientSecretFile", "", "File containing the tailscale OAUTH2 client secret")
+	fs.BoolVar(&s.configTestOnly, "configtest", false, "Validate that authkeys can be generated. Exits 0 if everything works.")
 
 	var tags string
 	fs.StringVar(&tags, "tags", "", "Tailnet ACL tags assigned to the node, comma-separated")
