@@ -258,7 +258,6 @@
                 bob.execute(up_cmd)
 
             alice.start()
-            bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
             alice_ip = wait_for_hoopsnake_registered("alice-boot")
             bob.succeed(f"ssh-to-alice {alice_ip}", timeout=90)
             alice.wait_for_unit("multi-user.target", timeout=90)
@@ -345,7 +344,6 @@
 
             with subtest("Unlock alice's boot progress"):
                 alice.start()
-                bob.wait_until_succeeds("tailscale ping alice-boot", timeout=30)
                 alice_ip = wait_for_hoopsnake_registered("alice-boot")
                 bob.succeed(f"ssh-to-alice {alice_ip}", timeout=90)
                 alice.wait_until_succeeds("test -f /tmp/fnord")
@@ -353,6 +351,35 @@
 
             with subtest("Finish booting alice"):
                 alice.wait_for_unit("multi-user.target", timeout=90)
+          '';
+        };
+
+        configtest = pkgs.testers.runNixOSTest {
+          name = "hoopsnake-configtest";
+          nodes = {
+            inherit headscale bob;
+          };
+
+          testScript = ''
+            with subtest("Test setup"):
+                for node in [headscale, bob]:
+                        node.start()
+                headscale.wait_for_unit("headscale")
+                headscale.wait_for_open_port(${toString headscalePort})
+                headscale.wait_for_open_port(443)
+
+                # Create user and hoopsnake preauth key:
+                headscale.succeed("import-pregenerated-keys")
+
+                # Create headscale preauth-key that we use for tailscale
+                authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
+
+                # Connect peers
+                up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
+                bob.execute(up_cmd)
+                bob.execute(f"echo '{authkey}' > /tmp/clientId")
+            configtest_cmd = "systemd-run --wait --pipe --service-type=exec -E HOME=/tmp -p EnvironmentFile=${headscaleAccess}/authkey-envfile ${self.packages.${pkgs.stdenv.targetPlatform.system}.hoopsnake}/bin/hoopsnake -configtest -name bob /usr/bin/env"
+            bob.succeed(configtest_cmd)
           '';
         };
       };

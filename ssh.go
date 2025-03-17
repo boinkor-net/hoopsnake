@@ -96,6 +96,12 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 		return fmt.Errorf("could not listen on tailnet: %w", err)
 	}
 
+	if s.configTestOnly {
+		log.Printf("Configuration tested ok")
+		srv.Close()
+		return nil
+	}
+
 	go func() {
 		<-ctx.Done()
 		srv.Close()
