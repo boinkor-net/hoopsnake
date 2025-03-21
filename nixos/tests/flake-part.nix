@@ -66,7 +66,7 @@
 
         headscale users create --config ./config.yaml bob
         api_key="$(headscale apikeys create --config ./config.yaml)"
-        auth_key="$(headscale preauthkeys create --config ./config.yaml -u bob)"
+        auth_key="$(headscale preauthkeys create --reusable -e 24h --config ./config.yaml -u bob)"
         cat >$out/apikey-envfile <<EOF
         TS_API_KEY=$api_key
         TS_BASE_URL=${config.server_url}
@@ -201,6 +201,7 @@
               imports = [bootloader self.nixosModules.default];
               boot.initrd.preLVMCommands = ''
                 while ! [ -f /tmp/fnord ] ; do
+                  pgrep $hoopsnakePid
                   sleep 1
                 done
               '';
@@ -344,6 +345,7 @@
 
             with subtest("Unlock alice's boot progress"):
                 alice.start()
+                alice.wait_for_unit("hoopsnake")
                 alice_ip = wait_for_hoopsnake_registered("alice-boot")
                 bob.succeed(f"ssh-to-alice {alice_ip}", timeout=90)
                 alice.wait_until_succeeds("test -f /tmp/fnord")
