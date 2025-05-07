@@ -85,7 +85,11 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 		return fmt.Errorf("could not setup a tsnet server: %w", err)
 	}
 
-	_, err = srv.Up(ctx)
+	// Do not shut down the tsnet server as soon as we're meant
+	// to close client connections; it shuts down after the
+	// SSH server terminates.
+	netCtx := context.WithoutCancel(ctx)
+	_, err = srv.Up(netCtx)
 	if err != nil {
 		return fmt.Errorf("could not connect to tailnet: %w", err)
 	}
