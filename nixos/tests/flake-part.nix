@@ -255,12 +255,19 @@
                 authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
 
                 # Connect peers
+                bob.wait_for_unit("tailscaled.service")
                 up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
                 bob.execute(up_cmd)
 
             alice.start()
             alice_ip = wait_for_hoopsnake_registered("alice-boot")
-            bob.succeed(f"ssh-to-alice {alice_ip}", timeout=90)
+
+            @polling_condition
+            def tailscale_running():
+                bob.succeed(f"tailscale status --peers=false")
+
+            with tailscale_running:
+              bob.succeed(f"ssh-to-alice {alice_ip}", timeout=90)
             alice.wait_for_unit("multi-user.target", timeout=90)
           '';
         };
@@ -340,14 +347,20 @@
                 authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
 
                 # Connect peers
+                bob.wait_for_unit("tailscaled.service")
                 up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
                 bob.execute(up_cmd)
+
+            @polling_condition
+            def tailscale_running():
+                bob.succeed(f"tailscale status --peers=false")
 
             with subtest("Unlock alice's boot progress"):
                 alice.start()
                 alice.wait_for_unit("hoopsnake")
                 alice_ip = wait_for_hoopsnake_registered("alice-boot")
-                bob.succeed(f"ssh-to-alice {alice_ip}", timeout=90)
+                with tailscale_running:
+                  bob.succeed(f"ssh-to-alice {alice_ip}", timeout=90)
                 alice.wait_until_succeeds("test -f /tmp/fnord")
                 alice.switch_root()
 
