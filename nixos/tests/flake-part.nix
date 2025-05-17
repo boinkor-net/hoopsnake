@@ -66,7 +66,7 @@
 
         headscale users create --config ./config.yaml bob
         api_key="$(headscale apikeys create --config ./config.yaml)"
-        auth_key="$(headscale preauthkeys create --reusable -e 24h --config ./config.yaml -u bob)"
+        auth_key="$(headscale preauthkeys create --reusable -e 100y --config ./config.yaml -u bob)"
         cat >$out/apikey-envfile <<EOF
         TS_API_KEY=$api_key
         TS_BASE_URL=${config.server_url}
@@ -235,11 +235,11 @@
             def wait_for_hoopsnake_registered(name):
                 "Poll until hoopsnake appears in the list of hosts, then return its IP."
                 while True:
-                    output = json.loads(headscale.succeed("headscale nodes list -o json-line"))
-                    print(output)
-                    basic_entry = [elt["ip_addresses"][0] for elt in output if elt["given_name"] == name]
-                    if len(basic_entry) == 1:
-                        return basic_entry[0]
+                    status = json.loads(bob.succeed("tailscale status --json --peers --self=false"))
+                    if status["Peer"] is not None:
+                      basic_entry = [elt["TailscaleIPs"][0] for _, elt in status["Peer"].items() if elt["HostName"] == name]
+                      if len(basic_entry) == 1:
+                          return basic_entry[0]
                     time.sleep(1)
 
 
@@ -319,11 +319,11 @@
             def wait_for_hoopsnake_registered(name):
                 "Poll until hoopsnake appears in the list of hosts, then return its IP."
                 while True:
-                    output = json.loads(headscale.succeed("headscale nodes list -o json-line"))
-                    print(output)
-                    basic_entry = [elt["ip_addresses"][0] for elt in output if elt["given_name"] == name]
-                    if len(basic_entry) == 1:
-                        return basic_entry[0]
+                    status = json.loads(bob.succeed("tailscale status --json --peers --self=false"))
+                    if status["Peer"] is not None:
+                      basic_entry = [elt["TailscaleIPs"][0] for _, elt in status["Peer"].items() if elt["HostName"] == name]
+                      if len(basic_entry) == 1:
+                          return basic_entry[0]
                     time.sleep(1)
 
             with subtest("Test setup"):
