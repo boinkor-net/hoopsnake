@@ -106,16 +106,15 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 		return nil
 	}
 
-	go func() {
-		<-ctx.Done()
-		srv.Close()
-	}()
-
 	err = s.setupPrometheus(ctx, srv)
 	if err != nil {
 		log.Printf("Setting up prometheus failed, but continuing anyway: %v", err)
 	}
 	log.Printf("starting ssh server on port :22...")
+	go func() {
+		<-ctx.Done()
+		_ = s.Server.Close()
+	}()
 	err = s.Server.Serve(listener)
 	if err != nil && ctx.Err() == nil {
 		return fmt.Errorf("ssh server failed serving: %w", err)
