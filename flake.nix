@@ -9,7 +9,6 @@
     }: {
       imports =
         [
-          inputs.generate-go-sri.flakeModules.default
           ./nixos/tests/flake-part.nix
         ]
         ++ lib.optional (inputs.devshell ? flakeModule) {
@@ -23,6 +22,11 @@
               ];
             };
           };
+        }
+        ++ lib.optional (inputs.generate-go-sri ? flakeModules) {
+          imports = [inputs.generate-go-sri.flakeModules.default];
+
+          perSystem.go-sri-hashes.default = {};
         };
 
       systems = ["x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin"];
@@ -33,7 +37,6 @@
         ...
       }: {
         formatter = pkgs.alejandra;
-        go-sri-hashes.default = {};
 
         packages = {
           default = config.packages.hoopsnake;
