@@ -195,6 +195,7 @@
           after = ["network-online.target" "initrd-nixos-copy-secrets.service"];
           before = ["shutdown.target" "initrd-switch-root.target"];
           conflicts = ["shutdown.target" "initrd-switch-root.target"];
+          unitConfig.DefaultDependencies = false;
 
           script = ''
             set -eu -x
