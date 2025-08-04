@@ -41,6 +41,7 @@
           sqlite.path = "@VARLIB@/headscale.db";
         };
         dns.magic_dns = false;
+        dns.override_local_dns = false;
       };
       configFile = pkgs.writeText "headscale-setup-config.yaml" (builtins.toJSON config);
     in
@@ -57,7 +58,7 @@
         headscale serve --config ./config.yaml &
         server_pid="$!"
         trap "kill $server_pid" EXIT
-        for try in $(seq 1 10); do
+        for try in $(seq 1 20); do
             if [ -e $VARLIB/headscale.sock ]; then
               break
             fi
@@ -66,7 +67,7 @@
 
         headscale users create --config ./config.yaml bob
         api_key="$(headscale apikeys create --config ./config.yaml)"
-        auth_key="$(headscale preauthkeys create --reusable -e 100y --config ./config.yaml -u bob)"
+        auth_key="$(headscale preauthkeys create --reusable -e 100y --config ./config.yaml -u 1)"
         cat >$out/apikey-envfile <<EOF
         TS_API_KEY=$api_key
         TS_BASE_URL=${config.server_url}
@@ -122,6 +123,7 @@
             server_url = "https://headscale";
             ip_prefixes = ["100.64.0.0/10"];
             dns.magic_dns = false;
+            dns.override_local_dns = false;
             derp.server = {
               enabled = true;
               region_id = 999;
@@ -252,7 +254,7 @@
 
                 # Import user & hoopsnake auth key
                 headscale.succeed("import-pregenerated-keys")
-                authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
+                authkey = headscale.succeed("headscale preauthkeys -u 1 create --reusable")
 
                 # Connect peers
                 up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
@@ -337,7 +339,7 @@
                 headscale.succeed("import-pregenerated-keys")
 
                 # Create headscale preauth-key that we use for tailscale
-                authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
+                authkey = headscale.succeed("headscale preauthkeys -u 1 create --reusable")
 
                 # Connect peers
                 up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
@@ -374,7 +376,7 @@
                 headscale.succeed("import-pregenerated-keys")
 
                 # Create headscale preauth-key that we use for tailscale
-                authkey = headscale.succeed("headscale preauthkeys -u bob create --reusable")
+                authkey = headscale.succeed("headscale preauthkeys -u 1 create --reusable")
 
                 # Connect peers
                 up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
