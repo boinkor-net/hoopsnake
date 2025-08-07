@@ -3,14 +3,32 @@
     flake-parts.lib.mkFlake {inherit inputs;} ({
       flake-parts-lib,
       self,
+      lib,
       withSystem,
       ...
     }: {
-      imports = [
-        inputs.devshell.flakeModule
-        inputs.generate-go-sri.flakeModules.default
-        ./nixos/tests/flake-part.nix
-      ];
+      imports =
+        [
+          ./nixos/tests/flake-part.nix
+        ]
+        ++ lib.optional (inputs.devshell ? flakeModule) {
+          imports = [inputs.devshell.flakeModule];
+
+          perSystem = {pkgs, ...}: {
+            devshells.default = {
+              packages = [
+                pkgs.go_1_23
+                pkgs.golangci-lint
+              ];
+            };
+          };
+        }
+        ++ lib.optional (inputs.generate-go-sri ? flakeModules) {
+          imports = [inputs.generate-go-sri.flakeModules.default];
+
+          perSystem.go-sri-hashes.default = {};
+        };
+
       systems = ["x86_64-linux" "aarch64-linux" "aarch64-darwin" "x86_64-darwin"];
       perSystem = {
         config,
@@ -19,11 +37,10 @@
         ...
       }: {
         formatter = pkgs.alejandra;
-        go-sri-hashes.default = {};
 
         packages = {
           default = config.packages.hoopsnake;
-          hoopsnake = pkgs.buildGo123Module rec {
+          hoopsnake = pkgs.buildGo123Module {
             pname = "hoopsnake";
             version = "0.0.0";
             vendorHash = builtins.readFile ./default.sri;
@@ -32,15 +49,6 @@
             CGO_ENABLED = 0;
             meta.mainProgram = "hoopsnake";
           };
-        };
-
-        devshells.default = {
-          commands = [
-          ];
-          packages = [
-            pkgs.go_1_23
-            pkgs.golangci-lint
-          ];
         };
       };
 
