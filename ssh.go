@@ -35,7 +35,7 @@ func (s *TailnetSSH) setupAuthorizedKeys() error {
 		for len(authorizedKeysBytes) > 0 {
 			pubKey, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedKeysBytes)
 			if err != nil {
-				return fmt.Errorf("Could not parse authorized key: %w", err)
+				return fmt.Errorf("could not parse authorized key: %w", err)
 			}
 
 			s.authorizedPubKeys = append(s.authorizedPubKeys, pubKey)
