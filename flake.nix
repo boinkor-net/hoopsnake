@@ -17,7 +17,7 @@
           perSystem = {pkgs, ...}: {
             devshells.default = {
               packages = [
-                pkgs.go_1_23
+                pkgs.go
                 pkgs.golangci-lint
               ];
             };
@@ -40,7 +40,7 @@
 
         packages = {
           default = config.packages.hoopsnake;
-          hoopsnake = pkgs.buildGo123Module {
+          hoopsnake = pkgs.buildGoModule {
             pname = "hoopsnake";
             version = "0.0.0";
             vendorHash = builtins.readFile ./default.sri;
