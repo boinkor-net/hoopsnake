@@ -35,7 +35,7 @@ func (s *TailnetSSH) setupAuthorizedKeys() error {
 		for len(authorizedKeysBytes) > 0 {
 			pubKey, _, _, rest, err := ssh.ParseAuthorizedKey(authorizedKeysBytes)
 			if err != nil {
-				return fmt.Errorf("Could not parse authorized key: %w", err)
+				return fmt.Errorf("could not parse authorized key: %w", err)
 			}
 
 			s.authorizedPubKeys = append(s.authorizedPubKeys, pubKey)
@@ -43,7 +43,7 @@ func (s *TailnetSSH) setupAuthorizedKeys() error {
 		}
 	}
 	if len(s.authorizedPubKeys) > 0 {
-		s.Server.PublicKeyHandler = s.validatePubkey
+		s.PublicKeyHandler = s.validatePubkey
 	}
 	return nil
 }
@@ -78,7 +78,7 @@ func (s *TailnetSSH) setupHostKey() error {
 // errors are fatal.
 func (s *TailnetSSH) Run(ctx context.Context) error {
 	var err error
-	s.Server.Handler = s.handle
+	s.Handler = s.handle
 
 	srv, err := s.tsnetServer(ctx)
 	if err != nil {
@@ -113,9 +113,9 @@ func (s *TailnetSSH) Run(ctx context.Context) error {
 	log.Printf("starting ssh server on port :22...")
 	go func() {
 		<-ctx.Done()
-		_ = s.Server.Close()
+		_ = s.Close()
 	}()
-	err = s.Server.Serve(listener)
+	err = s.Serve(listener)
 	if err != nil && ctx.Err() == nil {
 		return fmt.Errorf("ssh server failed serving: %w", err)
 	}
@@ -137,7 +137,7 @@ func setWinsize(f *os.File, width, height int) {
 
 func (s *TailnetSSH) handle(sess ssh.Session) {
 	// The command is passed in from the CLI, it's trusted by fiat:
-	cmd := exec.Command(s.command[0], s.command[1:]...) // #nosec G204
+	cmd := exec.CommandContext(sess.Context(), s.command[0], s.command[1:]...) // #nosec G204
 
 	ptyReq, winCh, isPty := sess.Pty()
 	if isPty {
