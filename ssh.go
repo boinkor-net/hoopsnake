@@ -137,7 +137,7 @@ func setWinsize(f *os.File, width, height int) {
 
 func (s *TailnetSSH) handle(sess ssh.Session) {
 	// The command is passed in from the CLI, it's trusted by fiat:
-	cmd := exec.Command(s.command[0], s.command[1:]...) // #nosec G204
+	cmd := exec.CommandContext(sess.Context(), s.command[0], s.command[1:]...) // #nosec G204
 
 	ptyReq, winCh, isPty := sess.Pty()
 	if isPty {
