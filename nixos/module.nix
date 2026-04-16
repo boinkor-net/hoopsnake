@@ -209,7 +209,7 @@
               -hostKey=''${CREDENTIALS_DIRECTORY}/privateHostKey \
               -clientIdFile=''${CREDENTIALS_DIRECTORY}/clientId \
               -clientSecretFile=''${CREDENTIALS_DIRECTORY}/clientSecret \
-              ${lib.escapeShellArg cfg.ssh.commandLine}
+              ${lib.escapeShellArgs cfg.ssh.commandLine}
           '';
 
           environment.HOME = "/tmp";
