@@ -9,8 +9,9 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/reiver/go-cast v0.0.0-20240904124821-be0103637c3f
 	golang.org/x/crypto v0.46.0
-	golang.org/x/oauth2 v0.33.0
+	golang.org/x/oauth2 v0.34.0
 	tailscale.com v1.96.5
+	tailscale.com/client/tailscale/v2 v2.9.0
 )
 
 require (

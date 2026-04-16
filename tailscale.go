@@ -5,12 +5,12 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 
-	"golang.org/x/oauth2/clientcredentials"
-	"tailscale.com/client/tailscale"
+	"tailscale.com/client/tailscale/v2"
 	"tailscale.com/ipn/store/mem"
 	"tailscale.com/tsnet"
 	"tailscale.com/types/logger"
@@ -53,12 +53,11 @@ func (s *TailnetSSH) tsnetServer(ctx context.Context) (*tsnet.Server, error) {
 	return srv, nil
 }
 
-func (s *TailnetSSH) setupTSClient(ctx context.Context) (*tailscale.Client, error) {
-	tailscale.I_Acknowledge_This_API_Is_Unstable = true // needed in order to use API clients.
+func (s *TailnetSSH) setupTSClient() (*tailscale.Client, error) {
 	apiKey, ok := getCredential("TS_API_KEY")
 	if ok {
 		log.Printf("WARNING: Using TS_API_KEY, the most inconvenient and insecure way to authenticate to tailscale. Please use oauth clients instead.")
-		return tailscale.NewClient("-", tailscale.APIKey(apiKey)), nil
+		return &tailscale.Client{Tailnet: "-", APIKey: apiKey}, nil
 	}
 
 	var clientID, clientSecret string
@@ -82,61 +81,58 @@ func (s *TailnetSSH) setupTSClient(ctx context.Context) (*tailscale.Client, erro
 		}
 	}
 
-	baseURL := cmp.Or(os.Getenv("TS_BASE_URL"), "https://api.tailscale.com")
-	tsClient := tailscale.NewClient("-", nil)
-	tsClient.BaseURL = baseURL
-	credentials := clientcredentials.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		TokenURL:     tsClient.BaseURL + "/api/v2/oauth/token",
-		Scopes:       []string{"device"},
+	baseURLStr := cmp.Or(os.Getenv("TS_BASE_URL"), "https://api.tailscale.com")
+	baseURL, err := url.Parse(baseURLStr)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse TS_BASE_URL (%#v) as a URL: %w", baseURLStr, err)
 	}
 
-	tsClient.HTTPClient = credentials.Client(ctx)
+	tsClient := &tailscale.Client{
+		Tailnet: "-",
+	}
+	tsClient.BaseURL = baseURL
+	tsClient.Auth = &tailscale.OAuth{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		Scopes:       []string{"device"},
+	}
 	return tsClient, nil
 }
 
 func (s *TailnetSSH) mintAuthKey(ctx context.Context) (string, *tailscale.Client, error) {
-	tsClient, err := s.setupTSClient(ctx)
+	tsClient, err := s.setupTSClient()
 	if err != nil {
 		return "", nil, err
 	}
-	caps := tailscale.KeyCapabilities{
-		Devices: tailscale.KeyDeviceCapabilities{
-			Create: tailscale.KeyDeviceCreateCapabilities{
-				Tags:          s.tags,
-				Ephemeral:     true,
-				Preauthorized: s.preauthorized,
-			},
-		},
-	}
-
-	authkey, _, err := tsClient.CreateKey(ctx, caps)
+	ckr := tailscale.CreateKeyRequest{}
+	ckr.Capabilities.Devices.Create.Tags = s.tags
+	ckr.Capabilities.Devices.Create.Ephemeral = true
+	ckr.Capabilities.Devices.Create.Preauthorized = s.preauthorized
+	authkey, err := tsClient.Keys().CreateAuthKey(ctx, ckr)
 	if err != nil {
 		return "", nil, fmt.Errorf("minting a tailscale pre-authenticated key for tags %v: %w", s.tags, err)
 	}
-	return authkey, tsClient, nil
+	return authkey.Key, tsClient, nil
 }
 
 func (s *TailnetSSH) cleanupOldNodes(ctx context.Context, tsClient *tailscale.Client) error {
-	devs, err := tsClient.Devices(ctx, tailscale.DeviceAllFields)
+	devs, err := tsClient.Devices().List(ctx, tailscale.WithFields(tailscale.IncludeFieldsAll))
 	if err != nil {
 		return fmt.Errorf("listing existing devices: %w", err)
 	}
 	for _, dev := range devs {
-		lastSeen, _ := time.Parse(time.RFC3339, dev.LastSeen)
 		if dev.Hostname != s.serviceName {
 			continue
 		}
-		recency := time.Since(lastSeen)
+		recency := time.Since(dev.LastSeen.Time)
 		if recency < s.maxNodeAge {
-			log.Printf("node %q/%q was seen %v ago, not evicting.", dev.Name, dev.DeviceID, recency)
+			log.Printf("node %q/%q was seen %v ago, not evicting.", dev.Name, dev.ID, recency)
 			continue
 		}
-		log.Printf("node %v was last seen %v, evicting", dev.Name, lastSeen)
-		err := tsClient.DeleteDevice(ctx, dev.DeviceID)
+		log.Printf("node %v was last seen %v, evicting", dev.Name, dev.LastSeen.Time)
+		err := tsClient.Devices().Delete(ctx, dev.ID)
 		if err != nil {
-			return fmt.Errorf("deleting device %q: %w", dev.DeviceID, err)
+			return fmt.Errorf("deleting device %q: %w", dev.ID, err)
 		}
 	}
 	return nil
