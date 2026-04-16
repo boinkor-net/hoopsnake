@@ -45,9 +45,14 @@
       };
       configFile = pkgs.writeText "headscale-setup-config.yaml" (builtins.toJSON config);
     in
-      pkgs.runCommand "setup-headscale" {
-        nativeBuildInputs = [pkgs.headscale pkgs.sqlite];
-      } ''
+      pkgs.runCommand "setup-headscale"
+      {
+        nativeBuildInputs = [
+          pkgs.headscale
+          pkgs.sqlite
+        ];
+      }
+      ''
         set -eux
 
         mkdir -p $out
@@ -145,7 +150,10 @@
         };
       };
       networking.firewall = {
-        allowedTCPPorts = [80 443];
+        allowedTCPPorts = [
+          80
+          443
+        ];
         allowedUDPPorts = [stunPort];
       };
       environment.systemPackages = [
@@ -188,84 +196,9 @@
     };
   in {
     checks =
-      if ! pkgs.lib.hasSuffix "linux" system
+      if !pkgs.lib.hasSuffix "linux" system
       then {}
       else {
-        hoopsnake-scripted = pkgs.testers.runNixOSTest {
-          name = "hoopsnake-scripted-initrd-stage1";
-          nodes = {
-            inherit headscale bob;
-            alice = {
-              lib,
-              config,
-              ...
-            }: {
-              imports = [bootloader self.nixosModules.default];
-              boot.initrd.preLVMCommands = ''
-                while ! [ -f /tmp/fnord ] ; do
-                  pgrep $hoopsnakePid
-                  sleep 1
-                done
-              '';
-
-              boot.initrd.network = {
-                hoopsnake = {
-                  enable = true;
-                  ssh = {
-                    authorizedKeysFile = "${clientKey}/client.pub";
-                    privateHostKey = "${hostkey}/hostkey";
-                    shell = lib.getExe (pkgs.writeShellApplication {
-                      name = "success";
-                      text = "touch /tmp/fnord";
-                    });
-                  };
-                  tailscale = {
-                    name = "alice-boot";
-                    tags = ["tag:hoopsnake"];
-                    environmentFile = "${headscaleAccess}/authkey-envfile";
-                    tsnetVerbose = true;
-                  };
-                };
-              };
-            };
-          };
-
-          testScript = ''
-            import time
-            import json
-
-            def wait_for_hoopsnake_registered(name):
-                "Poll until hoopsnake appears in the list of hosts, then return its IP."
-                while True:
-                    status = json.loads(bob.succeed("tailscale status --json --peers --self=false"))
-                    if status["Peer"] is not None:
-                      basic_entry = [elt["TailscaleIPs"][0] for _, elt in status["Peer"].items() if elt["HostName"] == name]
-                      if len(basic_entry) == 1:
-                          return basic_entry[0]
-                    time.sleep(1)
-
-
-            with subtest("Test setup"):
-                for node in [headscale, bob]:
-                    node.start()
-                headscale.wait_for_unit("headscale")
-                headscale.wait_for_open_port(${toString headscalePort})
-                headscale.wait_for_open_port(443)
-
-                # Import user & hoopsnake auth key
-                headscale.succeed("import-pregenerated-keys")
-                authkey = headscale.succeed("headscale preauthkeys -u 1 create --reusable")
-
-                # Connect peers
-                up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
-                bob.execute(up_cmd)
-
-            alice.start()
-            alice_ip = wait_for_hoopsnake_registered("alice-boot")
-            bob.succeed(f"ssh-to-alice {alice_ip}", timeout=90)
-            alice.wait_for_unit("multi-user.target", timeout=90)
-          '';
-        };
         hoopsnake-systemd = pkgs.testers.runNixOSTest {
           name = "hoopsnake-systemd-initrd-stage1";
           nodes = {
@@ -280,7 +213,10 @@
                 text = "touch /tmp/fnord";
               };
             in {
-              imports = [bootloader self.nixosModules.default];
+              imports = [
+                bootloader
+                self.nixosModules.default
+              ];
               testing.initrdBackdoor = true;
               boot.initrd.systemd = {
                 enable = true;
@@ -321,6 +257,7 @@
             def wait_for_hoopsnake_registered(name):
                 "Poll until hoopsnake appears in the list of hosts, then return its IP."
                 while True:
+                    bob.wait_until_succeeds(f"tailscale ping -c 1 {name}")
                     status = json.loads(bob.succeed("tailscale status --json --peers --self=false"))
                     if status["Peer"] is not None:
                       basic_entry = [elt["TailscaleIPs"][0] for _, elt in status["Peer"].items() if elt["HostName"] == name]
@@ -382,7 +319,9 @@
                 up_cmd = f"tailscale up --login-server 'https://headscale' --auth-key {authkey}"
                 bob.execute(up_cmd)
                 bob.execute(f"echo '{authkey}' > /tmp/clientId")
-            configtest_cmd = "systemd-run --wait --pipe --service-type=exec -E HOME=/tmp -p EnvironmentFile=${headscaleAccess}/authkey-envfile ${self.packages.${pkgs.stdenv.targetPlatform.system}.hoopsnake}/bin/hoopsnake -configtest -name bob /usr/bin/env"
+            configtest_cmd = "systemd-run --wait --pipe --service-type=exec -E HOME=/tmp -p EnvironmentFile=${headscaleAccess}/authkey-envfile ${
+              self.packages.${pkgs.stdenv.targetPlatform.system}.hoopsnake
+            }/bin/hoopsnake -configtest -name bob /usr/bin/env"
             bob.succeed(configtest_cmd)
           '';
         };
