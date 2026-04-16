@@ -45,6 +45,7 @@ type TailnetSSH struct {
 	prometheusAddr     string
 	clientIDFile       string
 	clientSecretFile   string
+	preauthorized      bool
 	tags               []string
 	command            []string
 	authorizedPubKeys  []gossh.PublicKey
@@ -70,6 +71,7 @@ func TailnetSSHFromArgs(args []string) (*TailnetSSH, error) {
 	fs.StringVar(&s.prometheusAddr, "prometheusAddr", ":9021", "Address on the tailnet node where prometheus requests get answered")
 	fs.StringVar(&s.clientIDFile, "clientIdFile", "", "File containing the tailscale OAUTH2 client ID")
 	fs.StringVar(&s.clientSecretFile, "clientSecretFile", "", "File containing the tailscale OAUTH2 client secret")
+	fs.BoolVar(&s.preauthorized, "preauthorized", false, "Automatically authorize the machine for the tailnet when authenticated by the minted key")
 	fs.BoolVar(&s.configTestOnly, "configtest", false, "Validate that authkeys can be generated. Exits 0 if everything works.")
 
 	var tags string

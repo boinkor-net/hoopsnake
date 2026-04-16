@@ -93,6 +93,7 @@
           type = types.nullOr types.path;
           default = null;
         };
+        preauthorized = mkEnableOption "automatic authorization of the machine for the tailnet";
         tsnetVerbose = mkEnableOption "verbose logging from the tsnet package";
 
         cleanup = {
@@ -130,6 +131,7 @@
 
           ${lib.getExe cfg.package} -name ${lib.escapeShellArg cfg.tailscale.name} \
              -tsnetVerbose=${lib.boolToString cfg.tailscale.tsnetVerbose} \
+             -preauthorized=${lib.boolToString cfg.tailscale.preauthorized} \
              -tags=${lib.escapeShellArg (lib.concatStringsSep "," cfg.tailscale.tags)} \
              -deleteExisting=${lib.boolToString cfg.tailscale.cleanup.deleteExisting} \
              -maxNodeAge=${lib.escapeShellArg cfg.tailscale.cleanup.maxNodeAge} \
@@ -202,6 +204,7 @@
 
             exec ${lib.getExe cfg.package} -name ${lib.escapeShellArg cfg.tailscale.name} \
               -tsnetVerbose=${lib.boolToString cfg.tailscale.tsnetVerbose} \
+              -preauthorized=${lib.boolToString cfg.tailscale.preauthorized} \
               -tags=${lib.escapeShellArg (lib.concatStringsSep "," cfg.tailscale.tags)} \
               -deleteExisting=${lib.boolToString cfg.tailscale.cleanup.deleteExisting} \
               -maxNodeAge=${lib.escapeShellArg cfg.tailscale.cleanup.maxNodeAge} \

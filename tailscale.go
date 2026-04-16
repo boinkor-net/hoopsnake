@@ -104,8 +104,9 @@ func (s *TailnetSSH) mintAuthKey(ctx context.Context) (string, *tailscale.Client
 	caps := tailscale.KeyCapabilities{
 		Devices: tailscale.KeyDeviceCapabilities{
 			Create: tailscale.KeyDeviceCreateCapabilities{
-				Tags:      s.tags,
-				Ephemeral: true,
+				Tags:          s.tags,
+				Ephemeral:     true,
+				Preauthorized: s.preauthorized,
 			},
 		},
 	}
