@@ -4,6 +4,7 @@
 {
   lib,
   pkgs,
+  options,
   config,
   ...
 }: {
@@ -123,10 +124,15 @@
 
   config = let
     cfg = config.boot.initrd.network.hoopsnake;
+    # Scripted stage 1 was removed in NixOS 26.11 (https://github.com/NixOS/nixpkgs/pull/573038),
+    # leaving `boot.initrd.systemd.enable` as a `mkRemovedOptionModule` stub without a default
+    # that throws when read.
+    hasScriptedStage1 = options.boot.initrd.systemd ? enable.default;
+    systemdStage1 = hasScriptedStage1 -> config.boot.initrd.systemd.enable;
   in
     lib.mkIf cfg.enable (
       lib.mkMerge [
-        (lib.mkIf (!config.boot.initrd.systemd.enable) {
+        (lib.mkIf (!systemdStage1) {
           # Scripted stage1 (sans systemd-in-initrd):
           boot.initrd.network.postCommands = lib.trivial.warn "Using scripted initrd with hoopsnake is deprecated as nixos will soon switch to systemd initrd only." ''
               echo "Starting hoopsnake..."
@@ -176,7 +182,7 @@
             })
           ];
         })
-        (lib.mkIf config.boot.initrd.systemd.enable (
+        (lib.mkIf systemdStage1 (
           let
             credentials = [
               "privateHostKey"
